@@ -203,6 +203,11 @@ class SpInsight(models.Model):
                     "action_coupon": best_camp.coupon_code or "", "action_discount": best_camp.discount_pct,
                 })
 
+            # Não repete um insight que o gestor ignorou nos últimos 14 dias
+            recent = self.search([("restaurant_id", "=", r.id), ("state", "=", "dismissed"),
+                                  ("create_date", ">=", fields.Datetime.now() - timedelta(days=14))])
+            handled = {(i.kind, i.action_label) for i in recent}
+            vals = [v for v in vals if (v.get("kind"), v.get("action_label")) not in handled]
             for v in vals:
                 v["restaurant_id"] = r.id
             self.create(vals)

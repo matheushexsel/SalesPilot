@@ -77,28 +77,50 @@
         </field>
     </record>
 
+    <!-- Busca própria do cardápio: só filtros que fazem sentido para o restaurante -->
+    <record id="view_sp_menu_item_search" model="ir.ui.view">
+        <field name="name">product.template.sp.menu.search</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" eval="False"/>
+        <field name="mode">primary</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <search string="Cardápio">
+                <field name="name" string="Item"/>
+                <field name="sp_menu_category_id"/>
+                <field name="sp_tags"/>
+                <field name="sp_restaurant_id"/>
+                <filter name="available" string="Disponível" domain="[('sp_available', '=', True)]"/>
+                <filter name="unavailable" string="Indisponível" domain="[('sp_available', '=', False)]"/>
+                <filter name="highlight" string="Destaque" domain="[('sp_highlight', '=', True)]"/>
+                <separator/>
+                <filter name="kind_main" string="Pratos principais" domain="[('sp_kind', '=', 'main')]"/>
+                <filter name="kind_combo" string="Combos" domain="[('sp_kind', '=', 'combo')]"/>
+                <filter name="kind_side" string="Acompanhamentos" domain="[('sp_kind', '=', 'side')]"/>
+                <filter name="kind_drink" string="Bebidas" domain="[('sp_kind', '=', 'drink')]"/>
+                <filter name="kind_dessert" string="Sobremesas" domain="[('sp_kind', '=', 'dessert')]"/>
+                <separator/>
+                <filter name="inactive" string="Arquivado" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="groupby_restaurant" string="Restaurante" context="{'group_by': 'sp_restaurant_id'}"/>
+                    <filter name="groupby_menu_category" string="Categoria do cardápio" context="{'group_by': 'sp_menu_category_id'}"/>
+                    <filter name="groupby_kind" string="Tipo no cardápio" context="{'group_by': 'sp_kind'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_sp_menu_items" model="ir.actions.act_window">
         <field name="name">Cardápio</field>
         <field name="res_model">product.template</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="domain">[('sp_restaurant_id', '!=', False)]</field>
-        <field name="context">{'default_type': 'consu', 'default_sale_ok': True, 'default_purchase_ok': False, 'search_default_groupby_restaurant': 1}</field>
+        <field name="context">{'default_type': 'consu', 'default_sale_ok': True, 'default_purchase_ok': False, 'default_sp_is_menu_item': True}</field>
+        <field name="search_view_id" ref="view_sp_menu_item_search"/>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('view_sp_menu_item_list')}),
             (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_sp_menu_item_kanban')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('product.product_template_only_form_view')})]"/>
     </record>
 
-    <record id="view_sp_menu_item_search" model="ir.ui.view">
-        <field name="name">product.template.sp.menu.search</field>
-        <field name="model">product.template</field>
-        <field name="inherit_id" ref="product.product_template_search_view"/>
-        <field name="arch" type="xml">
-            <xpath expr="//search" position="inside">
-                <field name="sp_restaurant_id"/>
-                <filter name="groupby_restaurant" string="Restaurante" context="{'group_by': 'sp_restaurant_id'}"/>
-                <filter name="groupby_menu_category" string="Categoria do cardápio" context="{'group_by': 'sp_menu_category_id'}"/>
-            </xpath>
-        </field>
-    </record>
 </odoo>

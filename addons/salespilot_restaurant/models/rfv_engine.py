@@ -256,7 +256,7 @@ class SpRfvEngine(models.AbstractModel):
                 p.write({
                     "sp_segment_prev": p.sp_segment if p.sp_segment not in (False, "none") else False,
                     "sp_segment": "none", "sp_r_score": 0, "sp_f_score": 0,
-                    "sp_v_score": 0, "sp_rfv_score": "---", "sp_churn_risk": "none", "sp_recurrence_ratio": 0,
+                    "sp_v_score": 0, "sp_fv_score": 0, "sp_rfv_score": "---", "sp_churn_risk": "none", "sp_recurrence_ratio": 0,
                     "sp_total_orders": 0, "sp_frequency": 0, "sp_monetary": 0, "sp_ltv": 0, "sp_avg_ticket": 0,
                     "sp_recency_days": 0, "sp_first_order_date": False, "sp_last_order_date": False,
                     "sp_typical_interval": 0, "sp_next_order_expected": False, "sp_favorite_product_id": False,
@@ -297,6 +297,7 @@ class SpRfvEngine(models.AbstractModel):
                 "sp_recency_days": s["recency"], "sp_frequency": s["frequency"], "sp_monetary": s["monetary"],
                 "sp_total_orders": s["total_orders"], "sp_ltv": s["ltv"], "sp_avg_ticket": s["avg_ticket"],
                 "sp_r_score": r, "sp_f_score": f, "sp_v_score": v, "sp_rfv_score": f"{r}{f}{v}",
+                "sp_fv_score": min(max(int((f + v) / 2.0 + 0.5), 1), 5),
                 "sp_segment_prev": (p.sp_segment if p.sp_segment != segment else p.sp_segment_prev)
                 if p.sp_segment not in (False, "none") else False,
                 "sp_segment_changed_date": datetime.now(TZ).date() if p.sp_segment != segment else p.sp_segment_changed_date,
@@ -407,7 +408,7 @@ class SpRfvEngine(models.AbstractModel):
         suggestions = []
         for tmpl_id, score in scores.most_common(limit * 2):
             tmpl = Template.browse(tmpl_id)
-            if tmpl.exists() and tmpl.sp_available and tmpl.active:
+            if tmpl.exists() and tmpl.sp_available and tmpl.active and tmpl.sale_ok:
                 suggestions.append({"product": tmpl, "confidence": min(score, 1.0),
                                     "reason": f"{int(min(score, 1.0) * 100)}% de quem pede isso também leva"})
             if len(suggestions) >= limit:
@@ -417,7 +418,7 @@ class SpRfvEngine(models.AbstractModel):
             for tmpl in Template.browse(product_tmpl_ids):
                 pair_prod = tmpl.sp_pair_product_id
                 if pair_prod and pair_prod.id not in product_tmpl_ids and \
-                        pair_prod.id not in [s["product"].id for s in suggestions] and pair_prod.sp_available:
+                        pair_prod.id not in [s["product"].id for s in suggestions] and pair_prod.sp_available and pair_prod.sale_ok:
                     suggestions.append({"product": pair_prod, "confidence": 0.5, "reason": "Combinação sugerida pela casa"})
                 if len(suggestions) >= limit:
                     break
@@ -431,7 +432,7 @@ class SpRfvEngine(models.AbstractModel):
         recs = []
         Template = self.env["product.template"]
         fav = partner.sp_favorite_product_id.product_tmpl_id
-        if fav and fav.sp_available:
+        if fav and fav.sp_available and fav.sale_ok and fav.active:
             recs.append({"product": fav, "reason": "Seu favorito", "kind": "favorite"})
         # Itens que acompanham o favorito
         if fav:
@@ -440,7 +441,7 @@ class SpRfvEngine(models.AbstractModel):
                     recs.append({"product": s["product"], "reason": s["reason"], "kind": "pair"})
         # Mais vendidos do restaurante para completar
         if len(recs) < limit:
-            best = Template.search([("sp_restaurant_id", "=", restaurant.id), ("sp_available", "=", True),
+            best = Template.search([("sp_restaurant_id", "=", restaurant.id), ("sp_available", "=", True), ("sale_ok", "=", True),
                                     ("id", "not in", [r["product"].id for r in recs])],
                                    order="sp_sold_qty_90d desc, sp_highlight desc", limit=limit)
             for t in best:
@@ -520,10 +521,9 @@ class SpRfvEngine(models.AbstractModel):
 
         # Matriz R x FV
         matrix = [[0] * 5 for _ in range(5)]
-        for p in Partner.search_read(pdom + [("sp_r_score", ">", 0)], ["sp_r_score", "sp_f_score", "sp_v_score"]):
-            fv = int(round((p["sp_f_score"] + p["sp_v_score"]) / 2.0))
-            fv = min(max(fv, 1), 5)
-            matrix[5 - p["sp_r_score"]][fv - 1] += 1
+        # Mesma fórmula do segmento (sp_fv_score), para o clique na célula abrir exatamente esses clientes
+        for p in Partner.search_read(pdom + [("sp_r_score", ">", 0), ("sp_fv_score", ">", 0)], ["sp_r_score", "sp_fv_score"]):
+            matrix[5 - p["sp_r_score"]][p["sp_fv_score"] - 1] += 1
 
         weeks = q(f"""SELECT date_trunc('week', date_order AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date AS wk,
                              SUM(amount_total), COUNT(*)
@@ -566,6 +566,8 @@ class SpRfvEngine(models.AbstractModel):
             },
             "segments": segments,
             "matrix": matrix,
+            "since_30d": d30.strftime("%Y-%m-%d %H:%M:%S"),
+            "can_manage": self.env.user.has_group("salespilot_restaurant.group_sp_manager"),
             "weeks": [{"week": w[0].strftime("%d/%m"), "revenue": w[1], "orders": w[2]} for w in weeks],
             "heat": heat, "weekday_short": WEEKDAY_SHORT,
             "channels": [{"code": c[0], "label": channel_labels.get(c[0], c[0]), "orders": c[1], "revenue": c[2]} for c in channels],

@@ -13,7 +13,7 @@ header p { margin: 2px 0 0; opacity:.92; font-size: 14px; }
 .identify input { flex:1; min-width: 180px; padding: 10px 12px; border:1px solid #e5e7eb; border-radius: 10px; font-size: 15px; }
 .btn { background: var(--p); color:#fff; border:0; border-radius: 10px; padding: 10px 14px; font-weight: 600; cursor:pointer; font-size: 14px; }
 .btn.sec { background:#eef0f3; color: var(--txt); }
-.btn.sm { padding: 6px 10px; font-size: 13px; }
+.btn.sm { padding: 6px 10px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
 .coupon { background:#fff7ed; border:1px dashed #fb923c; color:#9a3412; padding:10px 14px; border-radius: 12px; margin-top: 12px; font-size: 14px; }
 nav.cats { position: sticky; top:0; background: var(--bg); padding: 10px 0; display:flex; gap:8px; overflow-x:auto; z-index: 5; }
 nav.cats a { white-space: nowrap; padding: 8px 14px; border-radius: 999px; background:#fff; color: var(--txt); text-decoration:none; font-size: 14px; border:1px solid #e5e7eb; }
@@ -43,6 +43,7 @@ h2.cat { font-size: 18px; margin: 18px 0 10px; scroll-margin-top: 64px; }
 .line { display:flex; justify-content: space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; gap: 8px; font-size: 14px; }
 .sugg { background:#f0fdf4; border:1px solid #bbf7d0; border-radius: 12px; padding: 10px 12px; margin: 12px 0; }
 .sugg .s { display:flex; justify-content: space-between; align-items:center; gap:8px; padding: 6px 0; font-size: 14px; }
+.sugg .s > div, .rec-card > div { min-width: 0; }
 .sugg small { color: var(--muted); display:block; }
 label { display:block; font-size: 13px; color: var(--muted); margin-top: 10px; }
 input[type=text], input[type=tel], input[type=date], textarea, select { width:100%; padding: 10px 12px; border:1px solid #e5e7eb; border-radius: 10px; font-size: 15px; margin-top: 4px; font-family: inherit; }

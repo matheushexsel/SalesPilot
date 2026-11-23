@@ -215,7 +215,10 @@ class SpCampaign(models.Model):
         return {
             "type": "ir.actions.act_window", "res_model": "res.partner", "name": _("Público da campanha"),
             "view_mode": "list,kanban,form", "domain": [("id", "in", self._audience().ids)],
-            "context": {"search_default_sp_customers": 1},
+            "views": [(self.env.ref("salespilot_restaurant.view_sp_customer_list").id, "list"),
+                      (self.env.ref("salespilot_restaurant.view_sp_customer_kanban").id, "kanban"), (False, "form")],
+            "search_view_id": [self.env.ref("salespilot_restaurant.view_sp_customer_search").id, "search"],
+            "context": {"default_sp_is_customer": True, "default_sp_restaurant_id": self.restaurant_id.id},
         }
 
     def action_view_messages(self):

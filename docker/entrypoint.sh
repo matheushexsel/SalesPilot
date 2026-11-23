@@ -14,11 +14,21 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d postgres -lqt 2>/dev/null | cut -d '|' -f1 | grep -qw "$DB"; then
+db_ready() {
+  # Banco existe E o módulo está instalado (uma instalação interrompida não deixa o Odoo subir "vazio")
+  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB" -tAc \
+    "select 1 from ir_module_module where name='salespilot_restaurant' and state='installed'" 2>/dev/null | grep -q 1
+}
+
+if ! db_ready; then
   echo ">>> SalesPilot: criando banco '$DB' em pt-BR e instalando módulos (primeira execução, ~2 min)..."
-  odoo -c /etc/odoo/odoo.conf --db_host="$DB_HOST" --db_user="$DB_USER" --db_password="$DB_PASSWORD" -d "$DB" \
+  if ! odoo -c /etc/odoo/odoo.conf --db_host="$DB_HOST" --db_user="$DB_USER" --db_password="$DB_PASSWORD" -d "$DB" \
        -i salespilot_restaurant,salespilot_demo \
-       --without-demo=all --load-language=pt_BR --stop-after-init
+       --without-demo=all --load-language=pt_BR --stop-after-init; then
+    echo ">>> SalesPilot: a instalação falhou; removendo o banco '$DB' para tentar de novo no próximo start." >&2
+    PGPASSWORD="$DB_PASSWORD" dropdb -h "$DB_HOST" -U "$DB_USER" --if-exists "$DB" || true
+    exit 1
+  fi
   echo ">>> SalesPilot: banco pronto."
 fi
 

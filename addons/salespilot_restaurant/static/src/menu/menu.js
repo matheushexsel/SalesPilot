@@ -62,6 +62,7 @@
     }
 
     function change(id, d, fromRec) {
+        if (!byId[id]) return;  // item fora do cardápio (indisponível/arquivado)
         cart[id] = Math.min(Math.max((cart[id] || 0) + d, 0), MAX_QTY);
         if (!cart[id]) { delete cart[id]; recommended.delete(id); }
         if (fromRec && cart[id]) recommended.add(id);
@@ -70,7 +71,7 @@
         updateBar();
     }
 
-    function items() { return Object.entries(cart).map(([id, qty]) => ({id: +id, qty, name: byId[id].name, kind: byId[id].kind})); }
+    function items() { return Object.entries(cart).filter(([id]) => byId[id]).map(([id, qty]) => ({id: +id, qty, name: byId[id].name, kind: byId[id].kind})); }
     function subtotal() { return items().reduce((s, it) => s + it.qty * byId[it.id].price, 0); }
 
     function updateBar() {
@@ -116,6 +117,7 @@
         $('#f-phone').value = phone;
         const res = await rpc('identify', {phone});
         customer = res;
+        store.set('phone', phone);
         // Trocou o número? Limpa o que foi preenchido automaticamente para o número anterior
         // (o que o cliente digitou por conta própria é mantido).
         if ($('#f-name').value === autoFill.name) $('#f-name').value = '';
@@ -183,5 +185,6 @@
     $('#cart-close').onclick = () => $('#cart-modal').classList.remove('open');
     $('#btn-checkout').onclick = checkout;
     renderMenu(); updateBar();
+    if (!$('#phone').value && store.get('phone')) $('#phone').value = store.get('phone');  // mantém a identificação após recarregar
     if ($('#phone').value) identify(true);
 })();

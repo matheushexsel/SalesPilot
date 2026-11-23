@@ -135,6 +135,7 @@ class SalesPilotMenu(http.Controller):
             "config_json": Markup(json.dumps({"slug": rest.slug, "token": token or "", "delivery_fee": rest.delivery_fee}).replace("<", "\\u003c")),
             "token": token or "",
             "coupon": coupon or "",
+            "token_first_name": (msg.partner_id.name or "").split(" ")[0] if msg and msg.partner_id else "",
             "discount_pct": discount_pct,
             "discount_value": discount_value,
             "known_phone": known_phone,

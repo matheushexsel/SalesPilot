@@ -9,7 +9,8 @@ class SpMenuCategory(models.Model):
 
     name = fields.Char("Nome", required=True)
     sequence = fields.Integer("Sequência", default=10)
-    restaurant_id = fields.Many2one("sp.restaurant", string="Restaurante", required=True, ondelete="cascade", index=True)
+    restaurant_id = fields.Many2one("sp.restaurant", string="Restaurante", required=True, ondelete="cascade", index=True,
+                                    default=lambda self: self.env["sp.restaurant"]._get_user_restaurants()[:1])
     product_ids = fields.One2many("product.template", "sp_menu_category_id", string="Itens")
     product_count = fields.Integer("Nº de itens", compute="_compute_product_count")
 
@@ -21,7 +22,9 @@ class SpMenuCategory(models.Model):
 class ProductTemplate(models.Model):
     _inherit = "product.template"
 
-    sp_restaurant_id = fields.Many2one("sp.restaurant", string="Restaurante", index=True, ondelete="cascade")
+    sp_restaurant_id = fields.Many2one("sp.restaurant", string="Restaurante", index=True, ondelete="cascade",
+                                       default=lambda self: self.env["sp.restaurant"]._get_user_restaurants()[:1]
+                                       if self.env.context.get("default_sp_is_menu_item") else False)
     sp_menu_category_id = fields.Many2one("sp.menu.category", string="Categoria do cardápio",
                                           domain="[('restaurant_id', '=', sp_restaurant_id)]")
     sp_available = fields.Boolean("Disponível no cardápio", default=True)

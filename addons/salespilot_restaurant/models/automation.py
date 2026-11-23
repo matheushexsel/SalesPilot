@@ -193,7 +193,11 @@ class SpAutomation(models.Model):
         self.ensure_one()
         now_local = datetime.now(TZ)
         return {"type": "ir.actions.act_window", "res_model": "res.partner", "name": _("Clientes elegíveis agora"),
-                "view_mode": "list,form", "domain": [("id", "in", self._candidates(now_local).ids)]}
+                "view_mode": "list,kanban,form", "domain": [("id", "in", self._candidates(now_local).ids)],
+                "views": [(self.env.ref("salespilot_restaurant.view_sp_customer_list").id, "list"),
+                          (self.env.ref("salespilot_restaurant.view_sp_customer_kanban").id, "kanban"), (False, "form")],
+                "search_view_id": [self.env.ref("salespilot_restaurant.view_sp_customer_search").id, "search"],
+                "context": {"default_sp_is_customer": True, "default_sp_restaurant_id": self.restaurant_id.id}}
 
     def action_view_messages(self):
         self.ensure_one()

@@ -208,6 +208,11 @@ class Seeder:
         crons = env["ir.cron"].sudo().with_context(active_test=False).search([("cron_name", "ilike", "enrich")])
         crons.write({"active": False})
         env["ir.config_parameter"].sudo().set_param("crm.iap.lead.enrich.setting", "manual")
+        # Enriquecimento automático da empresa (partner_autocomplete) tenta sair para a internet no 1º login;
+        # no piloto isso só gera avisos no log.
+        companies = env["res.company"].sudo().search([])
+        if "iap_enrich_auto_done" in companies._fields:
+            companies.write({"iap_enrich_auto_done": True})
 
     def _create_restaurant(self, spec):
         vals = {k: v for k, v in spec.items() if k in (
@@ -569,6 +574,12 @@ class Seeder:
             "name": "Diogo (Burger do Diogo)", "login": "diogo", "password": "diogo123", "lang": "pt_BR", "tz": "America/Sao_Paulo",
             "email": "diogo@burgerdodiogo.com.br",
             "groups_id": [(6, 0, [env.ref("base.group_user").id, env.ref("salespilot_restaurant.group_sp_manager").id])],
+            "sp_restaurant_ids": [(6, 0, burger.ids)],
+        })
+        Users.create({
+            "name": "Operador (Burger do Diogo)", "login": "operador", "password": "operador123", "lang": "pt_BR", "tz": "America/Sao_Paulo",
+            "email": "balcao@burgerdodiogo.com.br",
+            "groups_id": [(6, 0, [env.ref("base.group_user").id, env.ref("salespilot_restaurant.group_sp_user").id])],
             "sp_restaurant_ids": [(6, 0, burger.ids)],
         })
         pizza = rests.filtered(lambda r: r.segment == "pizzaria")

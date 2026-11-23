@@ -139,7 +139,7 @@ export class SpDashboard extends Component {
         this.openCustomers([["sp_churn_risk", "in", ["warning", "critical"]]], "Red flags");
     }
     openNew() {
-        this.openCustomers([["sp_segment", "=", "new"]], "Novos clientes");
+        this.openCustomers([["sp_first_order_date", ">=", this.state.data.since_30d]], "Novos clientes (30 dias)");
     }
     openAlerts() {
         return this.openServerAction("action_sp_alerts", [["state", "=", "open"]], "Alertas", {});

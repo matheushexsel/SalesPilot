@@ -45,6 +45,7 @@ Requer PostgreSQL local (usuário `odoo` / senha `odoo`, com permissão de criar
 | `admin` | `admin` | Administrador SalesPilot (operadora) — vê os 3 restaurantes, prospecção e faturas |
 | `diogo` | `diogo123` | Gestor do **Burger do Diogo** — só vê os dados do próprio restaurante |
 | `lucia` | `lucia123` | Gestora da **Pizzaria Nonna Lúcia** |
+| `operador` | `operador123` | Operador do balcão do **Burger do Diogo** — registra pedidos e clientes e manda mensagens, mas não cria campanhas nem altera réguas/cardápio |
 
 ### Cardápios digitais públicos (sem login)
 
@@ -84,7 +85,8 @@ Menus: **Clientes › Base de clientes / Matriz RFV (kanban por segmento + pivô
 
 ### 2.3 Cardápio digital público (`/cardapio/<slug>`)
 - Mobile-first, sem login. O cliente informa o WhatsApp → **pop-up personalizado** com saudação (por privacidade, nome
-  completo e endereço só são preenchidos para quem chegou pelo próprio link rastreado)
+  completo e endereço só são preenchidos para quem chegou pelo próprio link rastreado **e** confirmou o próprio número;
+  um link encaminhado a terceiros mostra só o cupom e o primeiro nome)
   por perfil ("Quarta é dia de Smash Burger, né?", "Que saudade, faz 23 dias…", "Você é VIP 🏆")
   e recomendações (favorito + itens que acompanham + mais pedidos).
 - **Upsell/cross-sell na sacola**: coocorrência de itens ("44% de quem pede Smash leva Batata") e
@@ -99,8 +101,8 @@ Menus: **Clientes › Base de clientes / Matriz RFV (kanban por segmento + pivô
 - Público por segmentos RFV, risco, dias sem pedir, favorito, opt-in — com contagem ao vivo e "Ver público".
 - Mensagem com variáveis `{nome} {produto_favorito} {cupom} {desconto} {link} {restaurante} {dia_semana} {dias_sem_pedir}`
   e botão **✨ Sugerir texto** (gerador local; opcionalmente um LLM via parâmetro `salespilot.llm_api_key`).
-- Cada destinatário recebe um **link rastreado** `/c/<token>` → registra o clique, abre o cardápio e
-  grava cookie de atribuição por 30 dias. Pedidos feitos depois contam para a campanha
+- Cada destinatário recebe um **link rastreado** `/c/<token>` → registra o clique, abre o cardápio com o cupom
+  já aplicado e grava cookie de atribuição por 30 dias (o cliente digita o WhatsApp para ver as recomendações). Pedidos feitos depois contam para a campanha
   (**cliques, conversão, receita atribuída, custo e ROI**).
 - Provedor de envio = `simulation` (parâmetro `salespilot.message_provider`). A integração com a
   WhatsApp Cloud API entra em `sp.message._provider_send_meta` quando for o momento.

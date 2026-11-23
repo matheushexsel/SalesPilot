@@ -64,6 +64,7 @@ class ResPartner(models.Model):
     sp_r_score = fields.Integer("Score R", readonly=True)
     sp_f_score = fields.Integer("Score F", readonly=True)
     sp_v_score = fields.Integer("Score V", readonly=True)
+    sp_fv_score = fields.Integer("Score FV", readonly=True, help="Média de frequência e valor (coluna da matriz RFV)")
     sp_rfv_score = fields.Char("RFV", readonly=True)
     sp_segment = fields.Selection(RFV_SEGMENTS, string="Segmento RFV", default="none", readonly=True, index=True)
     sp_segment_prev = fields.Selection(RFV_SEGMENTS, string="Segmento anterior", readonly=True)

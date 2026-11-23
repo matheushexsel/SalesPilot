@@ -39,7 +39,7 @@
             <div class="muted" style="flex-basis:100%" id="identify-hint">Identifique-se para receber recomendações com base nos seus pedidos.</div>
         </div>
         <div class="coupon" t-if="coupon">
-            🎟️ Cupom <strong><t t-out="coupon"/></strong> aplicado no checkout
+            <t t-if="token_first_name">Oi, <t t-out="token_first_name"/>! </t>🎟️ Cupom <strong><t t-out="coupon"/></strong> aplicado no checkout
             <t t-if="discount_pct">(<t t-out="'%g' % discount_pct"/>% de desconto)</t>
             <t t-if="discount_value">(R$ <t t-out="'%.2f' % discount_value"/> de desconto)</t>.
         </div>
