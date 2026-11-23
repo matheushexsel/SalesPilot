@@ -126,14 +126,15 @@ class SpOrder(models.Model):
         """Hook executado quando o pedido passa a contar para o RFV."""
         if not self:
             return
+        first_timers = {}
         for order in self:
             if not order.partner_id.sp_is_customer:
                 order.partner_id.sudo().sp_is_customer = True
-            if not order.partner_id.sp_first_order_date:
-                self.env["sp.automation"]._trigger_event("welcome", order.partner_id, order=order)
-            if order.campaign_id:
-                order.campaign_id._invalidate_stats()
+            if not order.partner_id.sp_first_order_date and order.partner_id.id not in first_timers:
+                first_timers[order.partner_id.id] = order
         self._refresh_partner_stats()
+        for order in first_timers.values():
+            self.env["sp.automation"]._trigger_event("welcome", order.partner_id, order=order)
         self.env["sp.alert"].resolve_for_partners(self.mapped("partner_id"), reason="Cliente voltou a comprar")
 
     def _refresh_partner_stats(self):

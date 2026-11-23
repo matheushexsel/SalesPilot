@@ -66,6 +66,7 @@ class ResPartner(models.Model):
     sp_rfv_score = fields.Char("RFV", readonly=True)
     sp_segment = fields.Selection(RFV_SEGMENTS, string="Segmento RFV", default="none", readonly=True, index=True)
     sp_segment_prev = fields.Selection(RFV_SEGMENTS, string="Segmento anterior", readonly=True)
+    sp_segment_changed_date = fields.Date("Segmento alterado em", readonly=True)
     sp_typical_interval = fields.Float("Intervalo típico (dias)", readonly=True,
                                        help="Mediana dos dias entre pedidos consecutivos.")
     sp_next_order_expected = fields.Date("Próximo pedido esperado", readonly=True)

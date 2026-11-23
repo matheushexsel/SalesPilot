@@ -43,6 +43,16 @@ def brl(value):
     return "R$ " + f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def local_to_utc(local_dt):
+    """datetime naive em horário de São Paulo -> datetime naive em UTC (formato do banco)."""
+    return TZ.localize(local_dt).astimezone(pytz.utc).replace(tzinfo=None)
+
+
+def local_month_start(ref=None):
+    ref = ref or datetime.now(TZ)
+    return local_to_utc(datetime(ref.year, ref.month, 1))
+
+
 def _median(values):
     return statistics.median(values) if values else 0.0
 
@@ -100,7 +110,9 @@ def frequency_score(freq, window_days):
 def segment_for(r, f, v, freq_window, total_orders):
     if total_orders == 0:
         return "none"
-    fv = int(round((f + v) / 2.0))
+    fv = int((f + v) / 2.0 + 0.5)  # arredondamento "meio para cima"
+    if total_orders == 1:
+        return {5: "new", 4: "new", 3: "promising", 2: "about_to_sleep"}.get(r, "hibernating")
     if r >= 4 and fv >= 4:
         return "champions"
     if r <= 1 and fv >= 4:
@@ -244,9 +256,13 @@ class SpRfvEngine(models.AbstractModel):
             s = stats[p.id]
             if not s:
                 p.write({
-                    "sp_segment_prev": p.sp_segment, "sp_segment": "none", "sp_r_score": 0, "sp_f_score": 0,
+                    "sp_segment_prev": p.sp_segment if p.sp_segment not in (False, "none") else False,
+                    "sp_segment": "none", "sp_r_score": 0, "sp_f_score": 0,
                     "sp_v_score": 0, "sp_rfv_score": "---", "sp_churn_risk": "none", "sp_recurrence_ratio": 0,
-                    "sp_total_orders": 0, "sp_frequency": 0, "sp_monetary": 0, "sp_ltv": 0,
+                    "sp_total_orders": 0, "sp_frequency": 0, "sp_monetary": 0, "sp_ltv": 0, "sp_avg_ticket": 0,
+                    "sp_recency_days": 0, "sp_first_order_date": False, "sp_last_order_date": False,
+                    "sp_typical_interval": 0, "sp_next_order_expected": False, "sp_favorite_product_id": False,
+                    "sp_favorite_weekday": False, "sp_favorite_hour": 0, "sp_favorite_channel": False,
                     "sp_profile_summary": "Cadastro sem pedidos registrados.",
                 })
                 continue
@@ -269,7 +285,8 @@ class SpRfvEngine(models.AbstractModel):
                         risk = "warning"
             next_expected = False
             if s["typical_interval"]:
-                next_expected = (s["last"] + timedelta(days=s["typical_interval"])).date()
+                last_local = s["last"].replace(tzinfo=pytz.utc).astimezone(TZ)
+                next_expected = (last_local + timedelta(days=s["typical_interval"])).date()
 
             fav_name = ""
             if s["fav_product"]:
@@ -284,6 +301,7 @@ class SpRfvEngine(models.AbstractModel):
                 "sp_r_score": r, "sp_f_score": f, "sp_v_score": v, "sp_rfv_score": f"{r}{f}{v}",
                 "sp_segment_prev": (p.sp_segment if p.sp_segment != segment else p.sp_segment_prev)
                 if p.sp_segment not in (False, "none") else False,
+                "sp_segment_changed_date": fields.Date.context_today(p) if p.sp_segment != segment else p.sp_segment_changed_date,
                 "sp_segment": segment,
                 "sp_typical_interval": s["typical_interval"], "sp_next_order_expected": next_expected,
                 "sp_favorite_product_id": s["fav_product"],
@@ -459,7 +477,7 @@ class SpRfvEngine(models.AbstractModel):
         d30 = now - timedelta(days=30)
         d60 = now - timedelta(days=60)
         d90 = now - timedelta(days=90)
-        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_start = local_month_start()
         rid = restaurant.id
 
         def q(sql, params):
@@ -509,7 +527,8 @@ class SpRfvEngine(models.AbstractModel):
             fv = min(max(fv, 1), 5)
             matrix[5 - p["sp_r_score"]][fv - 1] += 1
 
-        weeks = q(f"""SELECT date_trunc('week', date_order)::date AS wk, SUM(amount_total), COUNT(*)
+        weeks = q(f"""SELECT date_trunc('week', date_order AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date AS wk,
+                             SUM(amount_total), COUNT(*)
                       {base} AND date_order >= %s GROUP BY wk ORDER BY wk""", (rid, ACTIVE_STATES, now - timedelta(weeks=12)))
         heat_rows = q(f"SELECT weekday, hour, COUNT(*) {base} AND date_order >= %s GROUP BY weekday, hour", (rid, ACTIVE_STATES, d90))
         heat = [[0] * 24 for _ in range(7)]

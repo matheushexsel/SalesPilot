@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """Réguas automáticas de relacionamento (aniversário, hábito, red flag, boas-vindas, pós-compra)."""
+import logging
 from datetime import datetime, timedelta
 
 import pytz
 
 from odoo import api, fields, models, _
+
+_logger = logging.getLogger(__name__)
 
 from .campaign import CHANNELS, DEFAULT_TEMPLATES
 from .rfv_engine import TZ
@@ -81,12 +84,15 @@ class SpAutomation(models.Model):
         return self.send_hour_start <= now_local.hour < (self.send_hour_end or 24)
 
     def _recently_messaged(self, partner):
-        """Respeita o cooldown da régua e o intervalo mínimo global do restaurante."""
+        """Respeita o cooldown da régua e o intervalo mínimo global do restaurante.
+
+        Gatilhos por evento (boas-vindas, pós-compra) e aniversário ignoram o intervalo global:
+        são mensagens esperadas pelo cliente e não devem ser engolidas por uma campanha recente."""
         self.ensure_one()
         now = fields.Datetime.now()
         global_days = self.restaurant_id.auto_message_cooldown_days or 0
-        if global_days and partner.sp_last_message_date and \
-                partner.sp_last_message_date > now - timedelta(days=global_days):
+        if global_days and self.trigger not in ("welcome", "post_purchase", "birthday") and \
+                partner.sp_last_message_date and partner.sp_last_message_date > now - timedelta(days=global_days):
             return True
         if self.cooldown_days:
             since = now - timedelta(days=self.cooldown_days)
@@ -118,7 +124,7 @@ class SpAutomation(models.Model):
                 dom += [("sp_recency_days", "<=", self.days_since_max)]
             return Partner.search(dom)
         if self.trigger == "habit":
-            target_hour = now_local.hour + (self.hours_before or 0)
+            target_hour = (now_local.hour + (self.hours_before or 0)) % 24
             return Partner.search(dom + [("sp_favorite_weekday", "=", str(now_local.weekday())),
                                          ("sp_favorite_hour", "=", target_hour),
                                          ("sp_churn_risk", "!=", "critical")])
@@ -126,7 +132,9 @@ class SpAutomation(models.Model):
             partners = Partner.search(dom + [("sp_birthday", "!=", False)])
             return partners.filtered(lambda p: p._birthday_in_days(now_local.date()) == (self.days_before or 0))
         if self.trigger == "vip":
-            return Partner.search(dom + [("sp_segment", "=", "champions"), ("sp_segment_prev", "!=", "champions")])
+            recent = now_local.date() - timedelta(days=14)
+            return Partner.search(dom + [("sp_segment", "=", "champions"), ("sp_segment_prev", "not in", ("champions", "none", False)),
+                                         ("sp_segment_changed_date", ">=", recent)])
         return Partner
 
     def _fire(self, partner, extra=None, order=None):
@@ -152,7 +160,11 @@ class SpAutomation(models.Model):
                     fields.Datetime.context_timestamp(auto.with_context(tz="America/Sao_Paulo"), auto.last_run).date() == now_local.date():
                 continue
             for partner in auto._candidates(now_local):
-                auto._fire(partner)
+                try:
+                    with self.env.cr.savepoint():
+                        auto._fire(partner)
+                except Exception:  # pragma: no cover - um cliente com problema não trava a régua
+                    _logger.exception("Régua %s falhou para o cliente %s", auto.name, partner.id)
             auto.last_run = fields.Datetime.now()
         return True
 

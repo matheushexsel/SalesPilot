@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
+import logging
 import secrets
 from datetime import timedelta
 
 from odoo import api, fields, models, _
+
+_logger = logging.getLogger(__name__)
 from odoo.exceptions import UserError
 
 from .res_partner import RFV_SEGMENTS
@@ -171,10 +174,6 @@ class SpCampaign(models.Model):
             rec.conversion_rate = (rec.order_count / rec.sent_count * 100.0) if rec.sent_count else 0.0
             rec.click_rate = (rec.click_count / rec.sent_count * 100.0) if rec.sent_count else 0.0
 
-    def _invalidate_stats(self):
-        self.invalidate_recordset(["sent_count", "order_count", "attributed_revenue", "roi"])
-        self._compute_stats()
-
     # ------------------------------------------------------------------
     # Ações
     # ------------------------------------------------------------------
@@ -248,9 +247,10 @@ class SpCampaign(models.Model):
         now = fields.Datetime.now()
         for camp in self.search([("state", "=", "scheduled"), ("date_scheduled", "<=", now)]):
             try:
-                camp._send()
+                with self.env.cr.savepoint():
+                    camp._send()
             except Exception:  # pragma: no cover - não travar a fila por uma campanha
-                self.env.cr.rollback()
+                _logger.exception("Falha ao enviar a campanha %s", camp.id)
                 camp._message_log(body=_("Falha ao enviar automaticamente; verifique a campanha."))
         # Encerra campanhas enviadas há mais de 14 dias
         old = now - timedelta(days=14)

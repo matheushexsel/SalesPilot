@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta
 
 from odoo import api, fields, models, _
 
-from .rfv_engine import ACTIVE_STATES
+from .rfv_engine import ACTIVE_STATES, local_to_utc
 
 
 class SpBillingPeriod(models.Model):
@@ -47,8 +47,8 @@ class SpBillingPeriod(models.Model):
         Order = self.env["sp.order"]
         for rec in self:
             r = rec.restaurant_id
-            dt_from = datetime.combine(rec.date_from, time.min)
-            dt_to = datetime.combine(rec.date_to, time.max)
+            dt_from = local_to_utc(datetime.combine(rec.date_from, time.min))
+            dt_to = local_to_utc(datetime.combine(rec.date_to + timedelta(days=1), time.min)) - timedelta(seconds=1)
             orders = Order.search([("restaurant_id", "=", r.id), ("state", "in", ACTIVE_STATES),
                                    ("date_order", ">=", dt_from), ("date_order", "<=", dt_to)])
             tracked = orders.filtered("tracked")
@@ -86,8 +86,11 @@ class SpBillingPeriod(models.Model):
         last_prev = first_this - timedelta(days=1)
         first_prev = last_prev.replace(day=1)
         for r in self.env["sp.restaurant"].search([]):
-            if not self.search_count([("restaurant_id", "=", r.id), ("date_from", "=", first_prev)]):
-                self.create({"restaurant_id": r.id, "date_from": first_prev, "date_to": last_prev}).action_compute()
+            period = self.search([("restaurant_id", "=", r.id), ("date_from", "=", first_prev)], limit=1)
+            if not period:
+                period = self.create({"restaurant_id": r.id, "date_from": first_prev, "date_to": last_prev})
+            if period.state == "draft":
+                period.action_compute()
         return True
 
     @api.model

@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime, timedelta
+
 from odoo import api, fields, models, _
 
-from .rfv_engine import brl
+from .rfv_engine import TZ, brl
 
 ALERT_TYPES = [
     ("churn_warning", "Queda de recorrência"),
@@ -40,15 +42,19 @@ class SpAlert(models.Model):
 
     # ------------------------------------------------------------------
     @api.model
-    def _open_exists(self, partner, alert_type):
+    def _open_exists(self, partner, alert_type, snooze_days=14):
+        """Já existe alerta aberto, ou um resolvido/ignorado há menos de `snooze_days` dias
+        (para "Ignorar" não voltar no dia seguinte)."""
+        since = fields.Datetime.now() - timedelta(days=snooze_days)
         return bool(self.search_count([("partner_id", "=", partner.id), ("alert_type", "=", alert_type),
-                                       ("state", "=", "open")]))
+                                       "|", ("state", "=", "open"), ("create_date", ">=", since)]))
 
     @api.model
     def scan(self, restaurants):
         """Gera alertas a partir do estado atual dos clientes (chamado após o RFV)."""
         Partner = self.env["res.partner"]
-        today = fields.Date.context_today(self)
+        today = datetime.now(TZ).date()
+        recent = today - timedelta(days=14)
         for restaurant in restaurants:
             base = [("sp_restaurant_id", "=", restaurant.id), ("sp_is_customer", "=", True)]
             for p in Partner.search(base + [("sp_churn_risk", "=", "critical")]):
@@ -70,8 +76,9 @@ class SpAlert(models.Model):
                         "description": p.sp_profile_summary,
                         "suggestion": "Lembrete leve do produto favorito, sem desconto ainda.",
                     })
-            for p in Partner.search(base + [("sp_segment", "=", "champions"), ("sp_segment_prev", "not in", ("champions", "none", False))]):
-                if not self._open_exists(p, "new_champion"):
+            for p in Partner.search(base + [("sp_segment", "=", "champions"), ("sp_segment_prev", "not in", ("champions", "none", False)),
+                                            ("sp_segment_changed_date", ">=", recent)]):
+                if not self._open_exists(p, "new_champion", snooze_days=60):
                     self.create({
                         "restaurant_id": restaurant.id, "partner_id": p.id, "alert_type": "new_champion", "severity": "1",
                         "name": f"{p.name} virou Campeão 🏆",
@@ -79,7 +86,7 @@ class SpAlert(models.Model):
                     })
             for p in Partner.search(base + [("sp_birthday", "!=", False), ("sp_opt_in", "=", True)]):
                 days = p._birthday_in_days(today)
-                if days is not None and 0 <= days <= 3 and not self._open_exists(p, "birthday"):
+                if days is not None and 0 <= days <= 3 and not self._open_exists(p, "birthday", snooze_days=30):
                     self.create({
                         "restaurant_id": restaurant.id, "partner_id": p.id, "alert_type": "birthday", "severity": "1",
                         "name": f"Aniversário de {p.name} {'hoje' if days == 0 else f'em {days} dia(s)'} 🎂",

@@ -6,7 +6,7 @@ red flag, aniversários e próximos pedidos estejam "frescos" no momento do test
 """
 import logging
 import random
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from odoo import SUPERUSER_ID, api
 
@@ -158,7 +158,7 @@ class Seeder:
     def __init__(self, env):
         self.env = env
         self.rnd = random.Random(2024)
-        self.now_local = datetime.utcnow() - TZ_OFFSET
+        self.now_local = datetime.now(timezone.utc).replace(tzinfo=None) - TZ_OFFSET
         self.today = self.now_local.date()
 
     # ------------------------------------------------------------------
@@ -232,6 +232,14 @@ class Seeder:
                 products[name].sp_pair_product_id = products[pair].id
         return products
 
+    def _birthday_in(self, days_ahead, age):
+        """Data de nascimento de quem faz `age` anos daqui a `days_ahead` dias (sem deriva de bissexto)."""
+        target = self.today + timedelta(days=days_ahead)
+        try:
+            return target.replace(year=target.year - age)
+        except ValueError:  # 29/02
+            return target.replace(year=target.year - age, day=28)
+
     def _phone(self):
         return f"(11) 9{self.rnd.randint(6000, 9999)}-{self.rnd.randint(1000, 9999)}"
 
@@ -274,11 +282,11 @@ class Seeder:
                   "street": "Rua Fradique Coutinho, 1200"},
                  ("at_risk", 0, 6, 8, (24, 24), 22)),
                 ({"name": "Carlos Eduardo Nunes", "sp_whatsapp": "(11) 99999-0003",
-                  "sp_birthday": self.today + timedelta(days=2) - timedelta(days=365 * 35),
+                  "sp_birthday": self._birthday_in(2, 35),
                   "street": "Rua Cardeal Arcoverde, 88"},
                  ("loyal", 0, 10, 14, None, 15)),
                 ({"name": "Juliana Rocha", "sp_whatsapp": "(11) 99999-0004",
-                  "sp_birthday": self.today - timedelta(days=365 * 29), "street": "Rua Wisard, 45"},
+                  "sp_birthday": self._birthday_in(0, 29), "street": "Rua Wisard, 45"},
                  ("champion", 0, 5, 7, None, 30)),
                 ({"name": "Marcos Vinícius Lima", "sp_whatsapp": "(11) 99999-0005", "street": "Rua Aspicuelta, 500"},
                  ("new", 0, 7, 10, None, 1)),
@@ -500,7 +508,7 @@ class Seeder:
             camp = Campaign.create({
                 "name": name.replace("{produto}", fav_name), "restaurant_id": rest.id, "campaign_type": ctype,
                 "channel": channel, "segment_codes": segs, "coupon_code": coupon or False, "discount_pct": disc,
-                "message_template": T[ctype], "date_scheduled": datetime.utcnow() - timedelta(days=days_ago),
+                "message_template": T[ctype], "date_scheduled": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_ago),
                 "state": "draft",
             })
             audience = camp._audience().filtered(lambda p: not (p.sp_whatsapp or "").startswith("(11) 99999-"))
@@ -508,7 +516,7 @@ class Seeder:
                 audience = env["res.partner"].search([("sp_restaurant_id", "=", rest.id), ("sp_opt_in", "=", True)], limit=25)
             audience = audience[: rnd.randint(25, 60)]
             msgs = Message.create([Message._prepare_from_campaign(camp, p) for p in audience])
-            sent_dt = datetime.utcnow() - timedelta(days=days_ago, hours=rnd.randint(1, 5))
+            sent_dt = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_ago, hours=rnd.randint(1, 5))
             msgs.write({"state": "delivered", "provider": "simulation", "date_sent": sent_dt})
             camp.write({"state": "sent" if days_ago < 14 else "done", "date_sent": sent_dt})
             # cliques e pedidos atribuídos
@@ -518,7 +526,7 @@ class Seeder:
                     msg.write({"clicked": True, "date_clicked": sent_dt + timedelta(hours=rnd.randint(1, 30)), "state": "read"})
                 if r < conv:
                     day_dt = sent_dt + timedelta(hours=rnd.randint(2, 70))
-                    if day_dt > datetime.utcnow():
+                    if day_dt > datetime.now(timezone.utc).replace(tzinfo=None):
                         continue
                     fav = msg.partner_id.sp_favorite_product_id.product_tmpl_id
                     fav_n = fav.name if fav and fav.name in products else rnd.choice(mains)
@@ -540,7 +548,7 @@ class Seeder:
             "name": "Fim de semana: combo pra família", "restaurant_id": rest.id, "campaign_type": "launch", "channel": "whatsapp",
             "segment_codes": "champions,loyal,potential_loyal,need_attention", "message_template":
                 "Oi {nome}! Fim de semana chegando 🙌 No {restaurante} tem combo pra família com entrega grátis até domingo. Garanta o seu: {link}",
-            "date_scheduled": datetime.utcnow() + timedelta(days=1), "state": "scheduled",
+            "date_scheduled": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=1), "state": "scheduled",
         })
 
     # ------------------------------------------------------------------

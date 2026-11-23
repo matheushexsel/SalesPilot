@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import secrets
 
+from markupsafe import escape
+
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
@@ -169,7 +171,7 @@ class SpMessage(models.Model):
             raise UserError(_("Cliente sem e-mail."))
         self.env["mail.mail"].sudo().create({
             "subject": f"{self.restaurant_id.name}",
-            "body_html": f"<p>{self.body}</p>",
+            "body_html": f"<p>{escape(self.body)}</p>".replace("\n", "<br/>"),
             "email_to": self.partner_id.email,
         }).send(raise_exception=False)
         self.write({"state": "sent", "provider": "mail", "date_sent": fields.Datetime.now()})

@@ -12,6 +12,8 @@ from werkzeug.exceptions import NotFound
 from odoo import fields, http
 from odoo.http import request
 
+from ..models.res_partner import normalize_phone
+
 _logger = logging.getLogger(__name__)
 ATTR_COOKIE = "sp_attr"
 PHONE_COOKIE = "sp_phone"
@@ -39,6 +41,10 @@ def _product_payload(tmpl):
         "serves": tmpl.sp_serves,
         "has_image": bool(tmpl.image_128),
     }
+
+
+class _CheckoutError(Exception):
+    """Erro de negócio no checkout: desfaz o savepoint e devolve a mensagem ao cliente."""
 
 
 class SalesPilotMenu(http.Controller):
@@ -101,7 +107,7 @@ class SalesPilotMenu(http.Controller):
                                 ("cash", "Dinheiro")],
         }
         response = request.render("salespilot_restaurant.menu_page", values)
-        if c:
+        if c and token:
             response.set_cookie(ATTR_COOKIE, c, max_age=COOKIE_AGE, samesite="Lax")
         return response
 
@@ -120,7 +126,6 @@ class SalesPilotMenu(http.Controller):
     def api_identify(self, slug, phone=None, **kw):
         rest = _restaurant(slug)
         env = request.env(su=True)
-        from ..models.res_partner import normalize_phone
         digits = normalize_phone(phone)
         partner = env["res.partner"].search([("sp_restaurant_id", "=", rest.id), ("sp_whatsapp_norm", "=", digits)], limit=1) if digits else None
         engine = env["sp.rfv.engine"]
@@ -130,12 +135,19 @@ class SalesPilotMenu(http.Controller):
             return {"known": False, "greeting": "Bem-vindo(a)! Olha os mais pedidos da casa:",
                     "recommendations": [{"id": t.id, "name": t.name, "price": t.list_price, "reason": "Mais pedido da casa"} for t in best]}
         recs = engine.recommend_for_partner(partner)
+        # Privacidade: nome completo e endereço só voltam para quem chegou pelo próprio link rastreado
+        # (cookie com o telefone). Para um número digitado, devolvemos só o primeiro nome e uma dica
+        # do endereço, suficiente para a experiência e inútil para quem tenta enumerar números.
+        trusted = normalize_phone(request.httprequest.cookies.get(PHONE_COOKIE)) == digits
+        street = partner.street or ""
+        address_hint = " ".join(street.split(",")[0].split(" ")[:3]) + " ..." if street else ""
         return {
             "known": True,
-            "name": partner.name,
+            "name": partner.name if trusted else (partner.name or "").split(" ")[0],
             "first_name": (partner.name or "").split(" ")[0],
-            "address": partner.contact_address_inline or partner.street or "",
-            "segment": partner.sp_segment,
+            "address": (partner.contact_address_inline or street) if trusted else "",
+            "address_hint": address_hint,
+            "trusted": trusted,
             "greeting": engine.greeting_for_partner(partner),
             "favorite_id": partner.sp_favorite_product_id.product_tmpl_id.id if partner.sp_favorite_product_id else None,
             "recommendations": [{"id": r["product"].id, "name": r["product"].name, "price": r["product"].list_price,
@@ -184,7 +196,6 @@ class SalesPilotMenu(http.Controller):
                      notes=None, coupon=None, token=None, recommended_ids=None, birthday=None, **kw):
         rest = _restaurant(slug)
         env = request.env(su=True)
-        from ..models.res_partner import normalize_phone
         items = items or []
         if not isinstance(items, list) or not items:
             return {"error": "Carrinho vazio."}
@@ -198,21 +209,13 @@ class SalesPilotMenu(http.Controller):
                 birthday = fields.Date.to_date(birthday)
             except (ValueError, TypeError):
                 birthday = None
-        extra = {}
-        if address:
-            extra["street"] = address
-        if birthday:
-            extra["sp_birthday"] = birthday
-        partner = env["res.partner"].sp_find_or_create_customer(rest, phone, name=name, extra=extra)
-        if address and not partner.street:
-            partner.street = address
-        if birthday and not partner.sp_birthday:
-            partner.sp_birthday = birthday
-
         Template = env["product.template"]
         lines = []
         subtotal = 0.0
-        recommended_ids = set(int(x) for x in (recommended_ids or []))
+        try:
+            recommended_ids = set(int(x) for x in (recommended_ids or []))
+        except (TypeError, ValueError):
+            recommended_ids = set()
         for it in items:
             try:
                 tmpl = Template.browse(int(it.get("id")))
@@ -230,6 +233,28 @@ class SalesPilotMenu(http.Controller):
         if subtotal < (rest.min_order or 0):
             return {"error": f"Pedido mínimo de R$ {rest.min_order:.2f}".replace(".", ",")}
 
+        # A partir daqui há escrita no banco: tudo dentro de um savepoint, para que um cupom
+        # inválido não deixe um cadastro de cliente para trás.
+        try:
+            with env.cr.savepoint():
+                return self._checkout_commit(env, rest, phone, name, address, birthday, lines, subtotal, payment_method,
+                                             notes, coupon, token, recommended_ids)
+        except _CheckoutError as exc:
+            return {"error": str(exc)}
+
+    def _checkout_commit(self, env, rest, phone, name, address, birthday, lines, subtotal, payment_method,
+                         notes, coupon, token, recommended_ids):
+        extra = {}
+        if address:
+            extra["street"] = address
+        if birthday:
+            extra["sp_birthday"] = birthday
+        partner = env["res.partner"].sp_find_or_create_customer(rest, phone, name=name, extra=extra)
+        if address and not partner.street:
+            partner.street = address
+        if birthday and not partner.sp_birthday:
+            partner.sp_birthday = birthday
+
         token = token or request.httprequest.cookies.get(ATTR_COOKIE)
         msg = env["sp.message"].search([("tracking_token", "=", token), ("restaurant_id", "=", rest.id)], limit=1) \
             if token else env["sp.message"]
@@ -245,22 +270,22 @@ class SalesPilotMenu(http.Controller):
                 src = automation
             else:
                 src = env["sp.campaign"].search([("restaurant_id", "=", rest.id), ("coupon_code", "=ilike", coupon),
-                                                 ("state", "in", ("scheduled", "sending", "sent", "done"))], limit=1) \
+                                                 ("state", "in", ("sending", "sent", "done"))], limit=1) \
                     or env["sp.automation"].search([("restaurant_id", "=", rest.id), ("coupon_code", "=ilike", coupon)], limit=1)
                 if src and src._name == "sp.campaign" and not campaign:
                     campaign = src
                 elif src and src._name == "sp.automation" and not automation:
                     automation = src
             if not src:
-                return {"error": "Cupom inválido ou expirado."}
+                raise _CheckoutError("Cupom inválido ou expirado.")
             # Validade (campanhas) e uso único por cliente
             if src._name == "sp.campaign" and src.coupon_valid_days and src.date_sent and \
                     fields.Datetime.now() > src.date_sent + timedelta(days=src.coupon_valid_days):
-                return {"error": "Este cupom expirou."}
+                raise _CheckoutError("Este cupom expirou.")
             already = env["sp.order"].search_count([("partner_id", "=", partner.id), ("coupon_code", "=ilike", coupon),
                                                     ("state", "in", ("confirmed", "preparing", "delivering", "delivered"))])
             if already:
-                return {"error": "Você já usou este cupom."}
+                raise _CheckoutError("Você já usou este cupom.")
             discount = subtotal * (src.discount_pct or 0) / 100.0 + (src.discount_value or 0.0)
 
         order = env["sp.order"].create({
@@ -268,8 +293,8 @@ class SalesPilotMenu(http.Controller):
             "partner_id": partner.id,
             "channel": "menu",
             "state": "confirmed",
-            "payment_method": payment_method,
-            "payment_status": "paid" if payment_method in ("pix", "online_card", "apple_pay") else "pending",
+            "payment_method": payment_method if payment_method in dict(env["sp.order"]._fields["payment_method"].selection) else "pix",
+            "payment_status": "pending",  # piloto: nenhum pagamento é cobrado de verdade
             "delivery_fee": rest.delivery_fee,
             "discount_amount": min(discount, subtotal),
             "delivery_address": address or partner.street or "",
@@ -284,7 +309,7 @@ class SalesPilotMenu(http.Controller):
         payment_info = {}
         if payment_method == "pix":
             payment_info = {"kind": "pix", "code": "00020126580014BR.GOV.BCB.PIX0136" + secrets.token_hex(16) + "5204000053039865802BR",
-                            "note": "Pagamento simulado no piloto: o pedido já foi registrado como pago."}
+                            "note": "Pix simulado no piloto: nenhuma cobrança é feita e o pedido fica como 'pagamento pendente'."}
         elif payment_method in ("online_card", "apple_pay"):
             payment_info = {"kind": payment_method, "note": "Pagamento simulado no piloto (gateway não integrado)."}
         else:
