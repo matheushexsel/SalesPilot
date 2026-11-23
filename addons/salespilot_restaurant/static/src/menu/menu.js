@@ -7,6 +7,7 @@
     const cart = {};           // id -> qty
     const recommended = new Set();
     let customer = null;
+    const autoFill = { name: null, address: null, placeholder: document.getElementById('f-address') ? document.getElementById('f-address').placeholder : '' };
     const brl = v => 'R$ ' + (v || 0).toFixed(2).replace('.', ',');
     const $ = s => document.querySelector(s);
     const MAX_QTY = 50;
@@ -115,9 +116,20 @@
         $('#f-phone').value = phone;
         const res = await rpc('identify', {phone});
         customer = res;
+        // Trocou o número? Limpa o que foi preenchido automaticamente para o número anterior
+        // (o que o cliente digitou por conta própria é mantido).
+        if ($('#f-name').value === autoFill.name) $('#f-name').value = '';
+        if ($('#f-address').value === autoFill.address) $('#f-address').value = '';
+        $('#f-address').placeholder = autoFill.placeholder;
+        autoFill.name = autoFill.address = null;
         if (res.known) {
-            if (res.trusted) { $('#f-name').value = res.name || ''; $('#f-address').value = res.address || ''; }
-            else { if (!$('#f-name').value) $('#f-name').value = res.first_name || ''; if (res.address_hint) $('#f-address').placeholder = 'Mesmo endereço de sempre? (' + res.address_hint + ')'; }
+            if (res.trusted) {
+                $('#f-name').value = autoFill.name = res.name || '';
+                $('#f-address').value = autoFill.address = res.address || '';
+            } else {
+                if (!$('#f-name').value) $('#f-name').value = autoFill.name = res.first_name || '';
+                if (res.address_hint) $('#f-address').placeholder = 'Mesmo endereço de sempre? (' + res.address_hint + ')';
+            }
             $('#identify-hint').textContent = 'Olá, ' + res.first_name + '! Recomendações personalizadas ativadas.';
         } else {
             $('#identify-hint').textContent = 'Primeiro pedido? Bem-vindo(a)! Ganhe mimos nas próximas compras.';

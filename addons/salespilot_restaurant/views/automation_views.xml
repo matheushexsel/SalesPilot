@@ -7,6 +7,7 @@
             <form string="Régua automática">
                 <header>
                     <button name="action_run_now" type="object" string="Executar agora" class="btn-primary"
+                            groups="salespilot_restaurant.group_sp_manager"
                             invisible="trigger in ('welcome', 'post_purchase')"
                             confirm="Disparar a régua para todos os clientes elegíveis agora?"/>
                     <button name="action_preview_candidates" type="object" string="Ver elegíveis agora"

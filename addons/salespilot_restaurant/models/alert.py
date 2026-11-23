@@ -136,8 +136,15 @@ class SpAlert(models.Model):
             "type": "ir.actions.act_window", "res_model": "sp.send.message.wizard", "name": _("Enviar mensagem"),
             "view_mode": "form", "views": [(False, "form")], "target": "new",
             "context": {"default_partner_ids": [(6, 0, self.partner_id.ids)], "default_restaurant_id": self.restaurant_id.id,
-                        "default_alert_id": self.id, "default_preset": "reactivation" if "churn" in self.alert_type or self.alert_type == "cant_lose" else self.alert_type},
+                        "default_alert_id": self.id, "default_preset": self._wizard_preset()},
         }
+
+    def _wizard_preset(self):
+        """Modelo de mensagem sugerido no assistente, por tipo de alerta."""
+        return {
+            "churn_warning": "reactivation", "churn_critical": "reactivation", "cant_lose": "reactivation",
+            "segment_drop": "reactivation", "birthday": "birthday", "new_champion": "vip",
+        }.get(self.alert_type, "manual")
 
     def action_open_partner(self):
         self.ensure_one()

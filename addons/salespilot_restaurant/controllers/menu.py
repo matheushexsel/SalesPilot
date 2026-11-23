@@ -324,7 +324,7 @@ class SalesPilotMenu(http.Controller):
                                                     ("state", "in", ("confirmed", "preparing", "delivering", "delivered"))])
             if already:
                 raise _CheckoutError("Você já usou este cupom.")
-            discount = subtotal * (src.discount_pct or 0) / 100.0 + (src.discount_value or 0.0)
+            discount = round(subtotal * (src.discount_pct or 0) / 100.0 + (src.discount_value or 0.0), 2)
 
         order = env["sp.order"].create({
             "restaurant_id": rest.id,
