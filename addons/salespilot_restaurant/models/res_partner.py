@@ -2,7 +2,8 @@
 import re
 from datetime import date
 
-from odoo import api, fields, models
+from odoo import api, fields, models, _
+from odoo.exceptions import AccessError
 
 RFV_SEGMENTS = [
     ("champions", "Campeões"),
@@ -93,6 +94,42 @@ class ResPartner(models.Model):
     sp_birthday_soon = fields.Boolean("Aniversário nos próximos 7 dias", compute="_compute_birthday_soon",
                                       search="_search_birthday_soon")
 
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        if (res.get("sp_is_customer") or self.env.context.get("default_sp_is_customer")) and not res.get("sp_restaurant_id") \
+                and "sp_restaurant_id" in fields_list:
+            rest = self.env["sp.restaurant"]._get_user_restaurants()[:1]
+            if rest:
+                res["sp_restaurant_id"] = rest.id
+        return res
+
+    def _sp_is_restricted_user(self):
+        """Usuário de restaurante (não admin SalesPilot, não superusuário)."""
+        return not self.env.su and self.env.user.has_group("salespilot_restaurant.group_sp_user") and \
+            not self.env.user.has_group("salespilot_restaurant.group_sp_admin")
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if self._sp_is_restricted_user():
+            allowed = set(self.env.user.sp_restaurant_ids.ids)
+            for vals in vals_list:
+                if vals.get("sp_restaurant_id") not in allowed:
+                    raise AccessError(_("Usuários de restaurante só podem cadastrar clientes do próprio restaurante."))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        # Um usuário de restaurante só edita clientes do próprio restaurante e não pode "soltar"
+        # ou transferir um cliente (perderia o isolamento). Reforço em Python além das regras de registro.
+        if self._sp_is_restricted_user():
+            allowed = set(self.env.user.sp_restaurant_ids.ids)
+            for rec in self:
+                if rec.sp_restaurant_id.id not in allowed:
+                    raise AccessError(_("Você só pode editar clientes do seu restaurante."))
+            if "sp_restaurant_id" in vals and vals["sp_restaurant_id"] not in allowed:
+                raise AccessError(_("Somente o administrador SalesPilot pode mover um cliente de restaurante."))
+        return super().write(vals)
+
     @api.depends("sp_whatsapp")
     def _compute_whatsapp_norm(self):
         for rec in self:
@@ -137,6 +174,9 @@ class ResPartner(models.Model):
         norm = normalize_phone(phone)
         partner = None
         if norm:
+            # Trava por (restaurante, telefone) até o fim da transação: dois checkouts simultâneos
+            # com o mesmo número novo não criam dois cadastros.
+            self.env.cr.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"sp_customer:{restaurant.id}:{norm}",))
             partner = self.search([("sp_restaurant_id", "=", restaurant.id), ("sp_whatsapp_norm", "=", norm)], limit=1)
         if not partner:
             vals = {

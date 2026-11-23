@@ -24,3 +24,4 @@ access_product_template_sp_user,product.template sp user,product.model_product_t
 access_product_template_sp_manager,product.template sp manager,product.model_product_template,group_sp_manager,1,1,1,1
 access_product_product_sp_user,product.product sp user,product.model_product_product,group_sp_user,1,0,0,0
 access_product_product_sp_manager,product.product sp manager,product.model_product_product,group_sp_manager,1,1,1,1
+access_res_partner_sp_user,res.partner sp user,base.model_res_partner,group_sp_user,1,1,1,0

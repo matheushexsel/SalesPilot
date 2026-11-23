@@ -10,7 +10,7 @@
         <record id="group_sp_user" model="res.groups">
             <field name="name">Operador do restaurante</field>
             <field name="category_id" ref="module_category_salespilot"/>
-            <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('base.group_partner_manager'))]"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
             <field name="comment">Vê clientes, pedidos e alertas dos restaurantes aos quais tem acesso.</field>
         </record>
 
@@ -186,10 +186,24 @@
         </record>
 
         <record id="rule_sp_partner_user" model="ir.rule">
-            <field name="name">SalesPilot: clientes dos restaurantes do usuário</field>
+            <field name="name">SalesPilot: leitura de clientes dos restaurantes do usuário (e contatos sem restaurante)</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="domain_force">['|', ('sp_restaurant_id', '=', False), ('sp_restaurant_id.user_ids', 'in', user.id)]</field>
             <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_sp_partner_user_write" model="ir.rule">
+            <field name="name">SalesPilot: escrita só em clientes dos restaurantes do usuário</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="domain_force">[('sp_restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
         <record id="rule_sp_partner_admin" model="ir.rule">
             <field name="name">SalesPilot: admin vê todos os clientes</field>

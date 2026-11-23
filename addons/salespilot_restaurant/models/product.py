@@ -35,6 +35,7 @@ class ProductTemplate(models.Model):
     sp_sold_qty_90d = fields.Integer("Vendidos (90 dias)", readonly=True)
     sp_revenue_90d = fields.Float("Receita (90 dias)", readonly=True)
     sp_pair_product_id = fields.Many2one("product.template", "Combina com",
+                                         domain="[('sp_restaurant_id', '=', sp_restaurant_id)]",
                                          help="Sugestão manual de acompanhamento (o motor também calcula automaticamente).")
 
     @api.onchange("sp_restaurant_id")

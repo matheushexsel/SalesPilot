@@ -164,6 +164,9 @@ class Seeder:
     # ------------------------------------------------------------------
     def run(self):
         env = self.env
+        if env["sp.restaurant"].search_count([("slug", "in", [r["slug"] for r in RESTAURANTS])]):
+            _logger.warning("SalesPilot demo: dados já existem neste banco; geração ignorada.")
+            return
         _logger.info("SalesPilot demo: gerando dados...")
         self._setup_company()
         restaurants = []
@@ -451,7 +454,7 @@ class Seeder:
                 pay = rnd.choice(pay_by_channel[channel])
                 vals_list.append({
                     "restaurant_id": rest.id, "partner_id": partner.id, "date_order": _to_utc(dt_local),
-                    "channel": channel, "state": state, "payment_method": pay,
+                    "channel": channel, "from_menu": channel == "menu", "state": state, "payment_method": pay,
                     "payment_status": "paid" if state == "delivered" or pay in ("pix", "online_card", "apple_pay", "ifood") else "pending",
                     "delivery_fee": 0.0 if channel == "counter" else rest.delivery_fee,
                     "line_ids": lines,
@@ -533,7 +536,7 @@ class Seeder:
                     items = self._pick_products(spec, products, "camp", fav_n, 1 if rnd.random() < 0.6 else 2)
                     subtotal = sum(products[n].list_price * q for n, q in items)
                     Order.create({
-                        "restaurant_id": rest.id, "partner_id": msg.partner_id.id, "date_order": day_dt, "channel": "menu",
+                        "restaurant_id": rest.id, "partner_id": msg.partner_id.id, "date_order": day_dt, "channel": "menu", "from_menu": True,
                         "state": "delivered", "payment_method": rnd.choice(["pix", "online_card", "card_delivery"]),
                         "payment_status": "paid", "delivery_fee": rest.delivery_fee, "coupon_code": coupon or False,
                         "discount_amount": subtotal * disc / 100.0, "campaign_id": camp.id, "message_id": msg.id,
@@ -559,14 +562,17 @@ class Seeder:
         admin.write({"sp_restaurant_ids": [(6, 0, rests.ids)],
                      "groups_id": [(4, env.ref("salespilot_restaurant.group_sp_admin").id)]})
         burger = rests.filtered(lambda r: r.segment == "hamburgueria")
-        env["res.users"].create({
+        Users = env["res.users"]
+        if Users.with_context(active_test=False).search_count([("login", "in", ("diogo", "lucia"))]):
+            return
+        Users.create({
             "name": "Diogo (Burger do Diogo)", "login": "diogo", "password": "diogo123", "lang": "pt_BR", "tz": "America/Sao_Paulo",
             "email": "diogo@burgerdodiogo.com.br",
             "groups_id": [(6, 0, [env.ref("base.group_user").id, env.ref("salespilot_restaurant.group_sp_manager").id])],
             "sp_restaurant_ids": [(6, 0, burger.ids)],
         })
         pizza = rests.filtered(lambda r: r.segment == "pizzaria")
-        env["res.users"].create({
+        Users.create({
             "name": "Lúcia (Pizzaria Nonna Lúcia)", "login": "lucia", "password": "lucia123", "lang": "pt_BR", "tz": "America/Sao_Paulo",
             "email": "lucia@nonnalucia.com.br",
             "groups_id": [(6, 0, [env.ref("base.group_user").id, env.ref("salespilot_restaurant.group_sp_manager").id])],

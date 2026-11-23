@@ -124,9 +124,9 @@ class SpAutomation(models.Model):
                 dom += [("sp_recency_days", "<=", self.days_since_max)]
             return Partner.search(dom)
         if self.trigger == "habit":
-            target_hour = (now_local.hour + (self.hours_before or 0)) % 24
-            return Partner.search(dom + [("sp_favorite_weekday", "=", str(now_local.weekday())),
-                                         ("sp_favorite_hour", "=", target_hour),
+            target = now_local + timedelta(hours=self.hours_before or 0)
+            return Partner.search(dom + [("sp_favorite_weekday", "=", str(target.weekday())),
+                                         ("sp_favorite_hour", "=", target.hour),
                                          ("sp_churn_risk", "!=", "critical")])
         if self.trigger == "birthday":
             partners = Partner.search(dom + [("sp_birthday", "!=", False)])

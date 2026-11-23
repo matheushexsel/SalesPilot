@@ -4,7 +4,7 @@ import unicodedata
 from datetime import timedelta
 
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tools.safe_eval import safe_eval
 
 
@@ -75,11 +75,28 @@ class SpRestaurant(models.Model):
     revenue_30d = fields.Float("Receita 30 dias", compute="_compute_counts")
     menu_url = fields.Char("URL do cardápio", compute="_compute_menu_url")
     last_rfv_run = fields.Datetime("Último cálculo RFV", readonly=True)
+    is_sp_admin = fields.Boolean(compute="_compute_is_sp_admin")
+
+    def _compute_is_sp_admin(self):
+        is_admin = self.env.user.has_group("salespilot_restaurant.group_sp_admin")
+        for rec in self:
+            rec.is_sp_admin = is_admin
     rfv_value_thresholds = fields.Json("Limiares de Valor (quintis)", readonly=True)
 
     _sql_constraints = [
         ("slug_unique", "unique(slug)", "Já existe um restaurante com este slug."),
     ]
+
+    # Campos que definem o contrato com a operadora / o acesso: só o admin SalesPilot altera.
+    ADMIN_ONLY_FIELDS = ("plan_monthly_fee", "plan_success_fee_pct", "marketplace_fee_reference_pct", "user_ids",
+                         "slug", "active", "company_id", "currency_id")
+
+    def write(self, vals):
+        if not self.env.su and not self.env.user.has_group("salespilot_restaurant.group_sp_admin"):
+            blocked = [f for f in vals if f in self.ADMIN_ONLY_FIELDS]
+            if blocked:
+                raise AccessError(_("Somente o administrador SalesPilot pode alterar: %s.", ", ".join(blocked)))
+        return super().write(vals)
 
     @api.constrains("slug")
     def _check_slug(self):
@@ -200,7 +217,11 @@ class SpRestaurant(models.Model):
         action["domain"] = base_domain + list(existing) + list(domain or [])
         if name:
             action["name"] = action["display_name"] = name
-        ctx = dict(context or {})
+        try:
+            ctx = dict(safe_eval(action.get("context") or "{}"))
+        except Exception:
+            ctx = {}
+        ctx.update(context or {})
         ctx.setdefault("default_" + field, restaurant.id)
         action["context"] = ctx
         return action

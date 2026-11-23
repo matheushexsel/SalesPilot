@@ -178,7 +178,7 @@ class SpMessage(models.Model):
 
     def register_click(self):
         for msg in self:
-            if not msg.clicked:
+            if not msg.clicked and msg.state in ("sent", "delivered", "read"):
                 msg.write({"clicked": True, "date_clicked": fields.Datetime.now(), "state": "read"})
         return True
 

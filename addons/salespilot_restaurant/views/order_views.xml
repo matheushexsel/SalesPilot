@@ -33,6 +33,7 @@
                             <field name="coupon_code"/>
                             <field name="campaign_id" readonly="1"/>
                             <field name="automation_id" readonly="1"/>
+                            <field name="from_menu" readonly="1"/>
                             <field name="tracked" readonly="1"/>
                             <field name="attributed" readonly="1"/>
                             <field name="recommendation_accepted" readonly="1"/>

@@ -119,8 +119,6 @@ def segment_for(r, f, v, freq_window, total_orders):
         return "cant_lose"
     if r >= 2 and fv >= 3:
         return "loyal"
-    if r >= 4 and fv <= 1 and total_orders == 1:
-        return "new"
     if r >= 4 and fv == 2:
         return "potential_loyal"
     if r in (2, 3) and fv == 2:
@@ -301,7 +299,7 @@ class SpRfvEngine(models.AbstractModel):
                 "sp_r_score": r, "sp_f_score": f, "sp_v_score": v, "sp_rfv_score": f"{r}{f}{v}",
                 "sp_segment_prev": (p.sp_segment if p.sp_segment != segment else p.sp_segment_prev)
                 if p.sp_segment not in (False, "none") else False,
-                "sp_segment_changed_date": fields.Date.context_today(p) if p.sp_segment != segment else p.sp_segment_changed_date,
+                "sp_segment_changed_date": datetime.now(TZ).date() if p.sp_segment != segment else p.sp_segment_changed_date,
                 "sp_segment": segment,
                 "sp_typical_interval": s["typical_interval"], "sp_next_order_expected": next_expected,
                 "sp_favorite_product_id": s["fav_product"],

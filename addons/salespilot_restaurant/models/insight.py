@@ -36,11 +36,12 @@ class SpInsight(models.Model):
     def action_apply(self):
         """Abre uma campanha pré-preenchida com a sugestão."""
         self.ensure_one()
-        self.state = "done"
         if not self.action_campaign_type:
+            self.state = "done"
             return True
         from .campaign import DEFAULT_TEMPLATES
         ctx = {
+            "sp_insight_id": self.id,
             "default_restaurant_id": self.restaurant_id.id,
             "default_name": self.action_label or self.name,
             "default_campaign_type": self.action_campaign_type,

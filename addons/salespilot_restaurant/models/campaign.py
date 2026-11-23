@@ -120,6 +120,14 @@ class SpCampaign(models.Model):
         for k, v in defaults.items():
             setattr(self, k, v)
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        insight_id = self.env.context.get("sp_insight_id")
+        if insight_id:
+            self.env["sp.insight"].browse(insight_id).sudo().write({"state": "done"})
+        return records
+
     # ------------------------------------------------------------------
     def _audience_domain(self):
         self.ensure_one()

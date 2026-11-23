@@ -44,7 +44,9 @@ class SpOrder(models.Model):
     partner_id = fields.Many2one("res.partner", "Cliente", required=True, index=True,
                                  domain="[('sp_restaurant_id', '=', restaurant_id)]")
     date_order = fields.Datetime("Data do pedido", required=True, default=fields.Datetime.now, index=True)
-    channel = fields.Selection(ORDER_CHANNELS, string="Canal", required=True, default="menu", index=True)
+    channel = fields.Selection(ORDER_CHANNELS, string="Canal", required=True, default="whatsapp", index=True)
+    from_menu = fields.Boolean("Feito pelo cardápio digital", default=False, readonly=True, index=True,
+                               help="Marcado apenas pelo próprio cardápio digital; é o que conta como jornada rastreada.")
     state = fields.Selection(ORDER_STATES, string="Status", default="draft", required=True, tracking=True, index=True)
     payment_method = fields.Selection(PAYMENT_METHODS, "Pagamento", default="pix")
     payment_status = fields.Selection([("pending", "Pendente"), ("paid", "Pago"), ("refunded", "Estornado")], string="Pagamento (status)",
@@ -79,11 +81,17 @@ class SpOrder(models.Model):
             order.amount_subtotal = sum(order.line_ids.mapped("price_subtotal"))
             order.amount_total = max(order.amount_subtotal + order.delivery_fee - order.discount_amount, 0.0)
 
-    @api.depends("campaign_id", "channel", "automation_id")
+    @api.depends("campaign_id", "from_menu", "automation_id")
     def _compute_attributed(self):
         for order in self:
             order.attributed = bool(order.campaign_id or order.automation_id)
-            order.tracked = order.channel == "menu" or order.attributed
+            order.tracked = order.from_menu or order.attributed
+
+    @api.constrains("discount_amount", "delivery_fee")
+    def _check_amounts(self):
+        for order in self:
+            if order.discount_amount < 0 or order.delivery_fee < 0:
+                raise UserError(_("Desconto e taxa de entrega não podem ser negativos."))
 
     @api.depends("date_order")
     def _compute_time_parts(self):
@@ -133,9 +141,9 @@ class SpOrder(models.Model):
             if not order.partner_id.sp_first_order_date and order.partner_id.id not in first_timers:
                 first_timers[order.partner_id.id] = order
         self._refresh_partner_stats()
+        self.env["sp.alert"].resolve_for_partners(self.mapped("partner_id"), reason="Cliente voltou a comprar")
         for order in first_timers.values():
             self.env["sp.automation"]._trigger_event("welcome", order.partner_id, order=order)
-        self.env["sp.alert"].resolve_for_partners(self.mapped("partner_id"), reason="Cliente voltou a comprar")
 
     def _refresh_partner_stats(self):
         if self.env.context.get("sp_skip_rfv"):
@@ -193,6 +201,12 @@ class SpOrderLine(models.Model):
     price_subtotal = fields.Float("Subtotal", compute="_compute_subtotal", store=True)
     notes = fields.Char("Observação")
     recommended = fields.Boolean("Sugerido pelo SalesPilot", default=False)
+
+    @api.constrains("qty", "price_unit")
+    def _check_line(self):
+        for line in self:
+            if line.qty <= 0 or line.price_unit < 0:
+                raise UserError(_("Quantidade deve ser positiva e o preço não pode ser negativo."))
 
     @api.depends("qty", "price_unit")
     def _compute_subtotal(self):

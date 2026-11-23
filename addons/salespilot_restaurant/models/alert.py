@@ -59,6 +59,13 @@ class SpAlert(models.Model):
             base = [("sp_restaurant_id", "=", restaurant.id), ("sp_is_customer", "=", True)]
             for p in Partner.search(base + [("sp_churn_risk", "=", "critical")]):
                 kind = "cant_lose" if p.sp_segment_prev in ("champions", "loyal") or p.sp_segment in ("cant_lose", "at_risk") else "churn_critical"
+                # Se já existe um alerta de "atraso" aberto, escala em vez de abrir outro
+                warning = self.search([("partner_id", "=", p.id), ("alert_type", "=", "churn_warning"), ("state", "=", "open")], limit=1)
+                if warning:
+                    warning.write({"alert_type": kind, "severity": "3",
+                                   "name": f"{p.name} sumiu: {p.sp_recency_days} dias sem pedir (ritmo: a cada {p.sp_typical_interval:.0f} dias)",
+                                   "description": p.sp_profile_summary})
+                    continue
                 if not self._open_exists(p, kind):
                     fav = p.sp_favorite_product_id.name or "o pedido de sempre"
                     self.create({
