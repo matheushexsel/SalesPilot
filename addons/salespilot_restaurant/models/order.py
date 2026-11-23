@@ -127,7 +127,8 @@ class SpOrder(models.Model):
         if not self:
             return
         for order in self:
-            order.partner_id.sp_is_customer = True
+            if not order.partner_id.sp_is_customer:
+                order.partner_id.sudo().sp_is_customer = True
             if not order.partner_id.sp_first_order_date:
                 self.env["sp.automation"]._trigger_event("welcome", order.partner_id, order=order)
             if order.campaign_id:
@@ -138,7 +139,7 @@ class SpOrder(models.Model):
     def _refresh_partner_stats(self):
         if self.env.context.get("sp_skip_rfv"):
             return
-        self.env["sp.rfv.engine"].recompute_partners(self.mapped("partner_id"))
+        self.env["sp.rfv.engine"].sudo().recompute_partners(self.mapped("partner_id").sudo())
 
     # Transições
     def action_confirm(self):
@@ -169,7 +170,7 @@ class SpOrder(models.Model):
     def unlink(self):
         partners = self.mapped("partner_id")
         res = super().unlink()
-        self.env["sp.rfv.engine"].recompute_partners(partners)
+        self.env["sp.rfv.engine"].sudo().recompute_partners(partners.sudo())
         return res
 
 

@@ -193,10 +193,13 @@ class Seeder:
         brl.active = True
         company = env.company
         company.write({"name": "SalesPilot Piloto", "currency_id": brl.id, "country_id": env.ref("base.br").id,
-                       "city": "São Paulo", "state_id": env.ref("base.state_br_sp").id})
+                       "city": "São Paulo", "state_id": env.ref("base.state_br_sp").id,
+                       "email": "contato@salespilot.com.br"})
         env["res.lang"]._activate_lang("pt_BR")
         admin = env.ref("base.user_admin")
         admin.write({"lang": "pt_BR", "tz": "America/Sao_Paulo", "name": "Matheus (SalesPilot)"})
+        if not admin.email:
+            admin.email = "admin@salespilot.com.br"
         env["ir.config_parameter"].sudo().set_param("salespilot.message_provider", "simulation")
         # Desliga serviços pagos/externos do Odoo que não fazem parte do piloto (enriquecimento IAP de leads)
         crons = env["ir.cron"].sudo().with_context(active_test=False).search([("cron_name", "ilike", "enrich")])
@@ -550,12 +553,14 @@ class Seeder:
         burger = rests.filtered(lambda r: r.segment == "hamburgueria")
         env["res.users"].create({
             "name": "Diogo (Burger do Diogo)", "login": "diogo", "password": "diogo123", "lang": "pt_BR", "tz": "America/Sao_Paulo",
+            "email": "diogo@burgerdodiogo.com.br",
             "groups_id": [(6, 0, [env.ref("base.group_user").id, env.ref("salespilot_restaurant.group_sp_manager").id])],
             "sp_restaurant_ids": [(6, 0, burger.ids)],
         })
         pizza = rests.filtered(lambda r: r.segment == "pizzaria")
         env["res.users"].create({
             "name": "Lúcia (Pizzaria Nonna Lúcia)", "login": "lucia", "password": "lucia123", "lang": "pt_BR", "tz": "America/Sao_Paulo",
+            "email": "lucia@nonnalucia.com.br",
             "groups_id": [(6, 0, [env.ref("base.group_user").id, env.ref("salespilot_restaurant.group_sp_manager").id])],
             "sp_restaurant_ids": [(6, 0, pizza.ids)],
         })

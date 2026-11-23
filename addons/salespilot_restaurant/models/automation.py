@@ -174,7 +174,7 @@ class SpAutomation(models.Model):
                 auto._fire(partner)
                 count += 1
             auto.last_run = fields.Datetime.now()
-            auto.message_post(body=_("Régua executada manualmente: %s cliente(s) elegíveis.", count))
+            auto._message_log(body=_("Régua executada manualmente: %s cliente(s) elegíveis.", count))
         return True
 
     def action_preview_candidates(self):

@@ -3,6 +3,7 @@
 import json
 import logging
 import secrets
+from datetime import timedelta
 
 from markupsafe import Markup
 
@@ -70,7 +71,10 @@ class SalesPilotMenu(http.Controller):
         token = c or request.httprequest.cookies.get(ATTR_COOKIE)
         msg = None
         if token:
-            msg = request.env["sp.message"].sudo().search([("tracking_token", "=", token)], limit=1)
+            msg = request.env["sp.message"].sudo().search([("tracking_token", "=", token),
+                                                            ("restaurant_id", "=", rest.id)], limit=1) or None
+            if not msg:
+                token = None
         coupon = msg.coupon_code if msg else ""
         discount_pct = 0.0
         discount_value = 0.0
@@ -142,15 +146,31 @@ class SalesPilotMenu(http.Controller):
     def api_suggest(self, slug, items=None, **kw):
         rest = _restaurant(slug)
         env = request.env(su=True)
-        tmpl_ids = [int(i["id"]) for i in (items or []) if i.get("id")]
+        tmpl_ids = []
+        for i in items or []:
+            try:
+                tmpl_ids.append(int(i.get("id")))
+            except (TypeError, ValueError):
+                continue
         if not tmpl_ids:
             return {"suggestions": []}
         suggestions = env["sp.rfv.engine"].cross_sell(rest, tmpl_ids, limit=3)
         out = [{"id": s["product"].id, "name": s["product"].name, "price": s["product"].list_price, "reason": s["reason"]}
                for s in suggestions]
         # Regra de upgrade: 2+ principais sem bebida grande -> sugerir bebida 2L / família
-        mains = sum(int(i.get("qty", 1)) for i in items if i.get("kind") == "main")
-        has_big_drink = any(i.get("kind") == "drink" and ("2l" in i.get("name", "").lower() or "1,5" in i.get("name", "").lower()) for i in items)
+        kinds = {t.id: (t.sp_kind, t.name or "") for t in env["product.template"].browse(tmpl_ids).exists()}
+        mains = 0
+        has_big_drink = False
+        for i in items:
+            try:
+                tid, qty = int(i.get("id")), max(int(float(i.get("qty", 1))), 0)
+            except (TypeError, ValueError):
+                continue
+            kind, name = kinds.get(tid, (None, ""))
+            if kind in ("main", "combo"):
+                mains += qty
+            if kind == "drink" and ("2l" in name.lower() or "1,5" in name.lower()):
+                has_big_drink = True
         if mains >= 2 and not has_big_drink:
             big = env["product.template"].search([("sp_restaurant_id", "=", rest.id), ("sp_kind", "=", "drink"),
                                                   ("sp_available", "=", True), ("name", "ilike", "2L")], limit=1)
@@ -164,11 +184,20 @@ class SalesPilotMenu(http.Controller):
                      notes=None, coupon=None, token=None, recommended_ids=None, birthday=None, **kw):
         rest = _restaurant(slug)
         env = request.env(su=True)
+        from ..models.res_partner import normalize_phone
         items = items or []
-        if not items:
+        if not isinstance(items, list) or not items:
             return {"error": "Carrinho vazio."}
-        if not phone:
-            return {"error": "Informe seu WhatsApp para continuar."}
+        if len(normalize_phone(phone)) < 12:  # 55 + DDD + número
+            return {"error": "Informe seu WhatsApp com DDD para continuar."}
+        name = (name or "").strip()[:80] or None
+        address = (address or "").strip()[:200] or None
+        notes = (notes or "").strip()[:500] or None
+        if birthday:
+            try:
+                birthday = fields.Date.to_date(birthday)
+            except (ValueError, TypeError):
+                birthday = None
         extra = {}
         if address:
             extra["street"] = address
@@ -185,10 +214,14 @@ class SalesPilotMenu(http.Controller):
         subtotal = 0.0
         recommended_ids = set(int(x) for x in (recommended_ids or []))
         for it in items:
-            tmpl = Template.browse(int(it["id"]))
-            if not tmpl.exists() or tmpl.sp_restaurant_id != rest:
-                continue
-            qty = max(float(it.get("qty", 1)), 1.0)
+            try:
+                tmpl = Template.browse(int(it.get("id")))
+                qty = float(it.get("qty", 1))
+            except (TypeError, ValueError):
+                return {"error": "Itens inválidos no carrinho."}
+            if not tmpl.exists() or tmpl.sp_restaurant_id != rest or not tmpl.sp_available:
+                return {"error": "Um dos itens não está mais disponível. Atualize o cardápio."}
+            qty = min(max(round(qty), 1), 50)
             subtotal += qty * tmpl.list_price
             lines.append((0, 0, {"product_id": tmpl.product_variant_id.id, "qty": qty, "price_unit": tmpl.list_price,
                                  "notes": it.get("notes") or False, "recommended": tmpl.id in recommended_ids}))
@@ -198,7 +231,8 @@ class SalesPilotMenu(http.Controller):
             return {"error": f"Pedido mínimo de R$ {rest.min_order:.2f}".replace(".", ",")}
 
         token = token or request.httprequest.cookies.get(ATTR_COOKIE)
-        msg = env["sp.message"].search([("tracking_token", "=", token)], limit=1) if token else env["sp.message"]
+        msg = env["sp.message"].search([("tracking_token", "=", token), ("restaurant_id", "=", rest.id)], limit=1) \
+            if token else env["sp.message"]
         discount = 0.0
         campaign = msg.campaign_id if msg else env["sp.campaign"]
         automation = msg.automation_id if msg else env["sp.automation"]
@@ -217,10 +251,17 @@ class SalesPilotMenu(http.Controller):
                     campaign = src
                 elif src and src._name == "sp.automation" and not automation:
                     automation = src
-            if src:
-                discount = subtotal * (src.discount_pct or 0) / 100.0 + (src.discount_value or 0.0)
-            else:
+            if not src:
                 return {"error": "Cupom inválido ou expirado."}
+            # Validade (campanhas) e uso único por cliente
+            if src._name == "sp.campaign" and src.coupon_valid_days and src.date_sent and \
+                    fields.Datetime.now() > src.date_sent + timedelta(days=src.coupon_valid_days):
+                return {"error": "Este cupom expirou."}
+            already = env["sp.order"].search_count([("partner_id", "=", partner.id), ("coupon_code", "=ilike", coupon),
+                                                    ("state", "in", ("confirmed", "preparing", "delivering", "delivered"))])
+            if already:
+                return {"error": "Você já usou este cupom."}
+            discount = subtotal * (src.discount_pct or 0) / 100.0 + (src.discount_value or 0.0)
 
         order = env["sp.order"].create({
             "restaurant_id": rest.id,

@@ -240,7 +240,7 @@ class SpCampaign(models.Model):
             msgs = Message.create(to_create)
             msgs.action_send()
             rec.write({"state": "sent", "date_sent": fields.Datetime.now()})
-            rec.message_post(body=_("Campanha enviada para %s cliente(s) pelo canal %s.", len(msgs), rec.channel))
+            rec._message_log(body=_("Campanha enviada para %s cliente(s) pelo canal %s.", len(msgs), rec.channel))
         return True
 
     @api.model
@@ -251,7 +251,7 @@ class SpCampaign(models.Model):
                 camp._send()
             except Exception:  # pragma: no cover - não travar a fila por uma campanha
                 self.env.cr.rollback()
-                camp.message_post(body=_("Falha ao enviar automaticamente; verifique a campanha."))
+                camp._message_log(body=_("Falha ao enviar automaticamente; verifique a campanha."))
         # Encerra campanhas enviadas há mais de 14 dias
         old = now - timedelta(days=14)
         self.search([("state", "=", "sent"), ("date_sent", "<", old)]).write({"state": "done"})

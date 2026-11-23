@@ -92,6 +92,8 @@ class SpBillingPeriod(models.Model):
 
     @api.model
     def generate_for_month(self, restaurant, year, month):
+        if isinstance(restaurant, int):
+            restaurant = self.env["sp.restaurant"].browse(restaurant)
         first = date(year, month, 1)
         last = (first.replace(month=month % 12 + 1, year=year + (month // 12)) - timedelta(days=1))
         period = self.search([("restaurant_id", "=", restaurant.id), ("date_from", "=", first)], limit=1)

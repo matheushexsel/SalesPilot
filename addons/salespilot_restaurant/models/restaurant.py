@@ -122,9 +122,12 @@ class SpRestaurant(models.Model):
     # Ações
     # ------------------------------------------------------------------
     def action_recompute_rfv(self):
-        self.env["sp.rfv.engine"].recompute(self)
-        self.env["sp.insight"].generate_for(self)
-        self.env["sp.alert"].scan(self)
+        # Roda como superusuário: o cálculo grava em clientes, produtos, insights e alertas,
+        # e operadores do restaurante só têm leitura em parte desses modelos.
+        env = self.env(su=True)
+        env["sp.rfv.engine"].recompute(self.sudo())
+        env["sp.insight"].generate_for(self.sudo())
+        env["sp.alert"].scan(self.sudo())
         return True
 
     def action_open_menu(self):
@@ -182,6 +185,8 @@ class SpRestaurant(models.Model):
     def get_dashboard_data(self, restaurant_id=None):
         restaurants = self._get_user_restaurants()
         restaurant = restaurants.filtered(lambda r: r.id == restaurant_id) if restaurant_id else restaurants[:1]
+        if not restaurant:
+            restaurant = restaurants[:1]  # id inválido ou sem acesso: cai no primeiro restaurante do usuário
         if not restaurant:
             return {"restaurants": [], "restaurant": None}
         restaurant = restaurant[:1]

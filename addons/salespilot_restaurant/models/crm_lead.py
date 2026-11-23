@@ -95,7 +95,7 @@ class CrmLead(models.Model):
         """Recalcula a qualificação e registra no chatter (ponto de extensão para IA externa)."""
         for lead in self:
             lead._compute_qualification()
-            lead.message_post(body=lead.sp_qualification_notes or _("Sem dados suficientes para qualificar."))
+            lead._message_log(body=lead.sp_qualification_notes or _("Sem dados suficientes para qualificar."))
             if lead.sp_qualification_score >= 70:
                 lead.priority = "3"
             elif lead.sp_qualification_score >= 45:

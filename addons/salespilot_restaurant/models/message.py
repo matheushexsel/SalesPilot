@@ -146,7 +146,7 @@ class SpMessage(models.Model):
                 continue
             try:
                 handler()
-                msg.partner_id.sp_last_message_date = fields.Datetime.now()
+                msg.partner_id.sudo().sp_last_message_date = fields.Datetime.now()
             except Exception as exc:  # pragma: no cover
                 msg.write({"state": "failed", "error": str(exc)[:200]})
         return True

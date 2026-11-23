@@ -145,7 +145,6 @@ class ResPartner(models.Model):
                 "sp_whatsapp": phone,
                 "phone": phone,
                 "sp_source": "menu",
-                "customer_rank": 1,
             }
             vals.update(extra or {})
             partner = self.create(vals)
@@ -170,5 +169,5 @@ class ResPartner(models.Model):
         }
 
     def action_sp_recompute(self):
-        self.env["sp.rfv.engine"].recompute_partners(self)
+        self.env["sp.rfv.engine"].sudo().recompute_partners(self.sudo())
         return True

@@ -240,7 +240,7 @@ class SpRfvEngine(models.AbstractModel):
         freq_thr = thresholds.get("frequency")
 
         product_names = {}
-        for p in partners:
+        for p in partners.sudo():
             s = stats[p.id]
             if not s:
                 p.write({
@@ -331,7 +331,7 @@ class SpRfvEngine(models.AbstractModel):
         rows = {r[0]: (r[1], r[2]) for r in self.env.cr.fetchall()}
         templates = self.env["product.template"].with_context(active_test=False).search(
             [("sp_restaurant_id", "=", restaurant.id)])
-        for t in templates:
+        for t in templates.sudo():
             qty, rev = rows.get(t.id, (0, 0.0))
             t.write({"sp_sold_qty_90d": int(qty), "sp_revenue_90d": rev})
 

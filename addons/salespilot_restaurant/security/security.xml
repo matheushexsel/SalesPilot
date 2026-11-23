@@ -10,7 +10,7 @@
         <record id="group_sp_user" model="res.groups">
             <field name="name">Operador do restaurante</field>
             <field name="category_id" ref="module_category_salespilot"/>
-            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('base.group_partner_manager'))]"/>
             <field name="comment">Vê clientes, pedidos e alertas dos restaurantes aos quais tem acesso.</field>
         </record>
 
@@ -132,6 +132,55 @@
         <record id="rule_sp_billing_admin" model="ir.rule">
             <field name="name">SalesPilot: admin vê todas as faturas</field>
             <field name="model_id" ref="model_sp_billing_period"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+
+        <record id="rule_sp_product_user" model="ir.rule">
+            <field name="name">SalesPilot: itens de cardápio dos restaurantes do usuário</field>
+            <field name="model_id" ref="product.model_product_template"/>
+            <field name="domain_force">['|', ('sp_restaurant_id', '=', False), ('sp_restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_product_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todos os itens de cardápio</field>
+            <field name="model_id" ref="product.model_product_template"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+        <record id="rule_sp_product_variant_user" model="ir.rule">
+            <field name="name">SalesPilot: variantes dos restaurantes do usuário</field>
+            <field name="model_id" ref="product.model_product_product"/>
+            <field name="domain_force">['|', ('product_tmpl_id.sp_restaurant_id', '=', False), ('product_tmpl_id.sp_restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_product_variant_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todas as variantes</field>
+            <field name="model_id" ref="product.model_product_product"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+        <record id="rule_sp_menu_category_user" model="ir.rule">
+            <field name="name">SalesPilot: categorias dos restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_menu_category"/>
+            <field name="domain_force">[('restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_menu_category_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todas as categorias</field>
+            <field name="model_id" ref="model_sp_menu_category"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+        <record id="rule_sp_order_line_user" model="ir.rule">
+            <field name="name">SalesPilot: itens de pedido dos restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_order_line"/>
+            <field name="domain_force">[('restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_order_line_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todos os itens de pedido</field>
+            <field name="model_id" ref="model_sp_order_line"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
         </record>
