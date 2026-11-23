@@ -1,0 +1,42 @@
+# SalesPilot - piloto em Odoo 18 Community
+# Sobe PostgreSQL + Odoo, cria o banco "salespilot" em pt-BR e instala os módulos
+# salespilot_restaurant (produto) e salespilot_demo (dados fictícios) automaticamente.
+#
+#   docker compose up -d
+#   # aguarde ~2 min na primeira vez e acesse http://localhost:8069  (admin / admin)
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  odoo:
+    image: odoo:18
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8069:8069"
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: odoo
+    volumes:
+      - ./addons:/mnt/extra-addons:ro
+      - ./odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./docker/entrypoint.sh:/usr/local/bin/salespilot-entrypoint.sh:ro
+      - odoo-data:/var/lib/odoo
+    entrypoint: ["/bin/bash", "/usr/local/bin/salespilot-entrypoint.sh"]
+
+volumes:
+  db-data:
+  odoo-data:

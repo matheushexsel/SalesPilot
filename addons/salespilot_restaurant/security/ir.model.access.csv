@@ -1,0 +1,26 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sp_restaurant_user,sp.restaurant user,model_sp_restaurant,group_sp_user,1,0,0,0
+access_sp_restaurant_manager,sp.restaurant manager,model_sp_restaurant,group_sp_manager,1,1,0,0
+access_sp_restaurant_admin,sp.restaurant admin,model_sp_restaurant,group_sp_admin,1,1,1,1
+access_sp_menu_category_user,sp.menu.category user,model_sp_menu_category,group_sp_user,1,0,0,0
+access_sp_menu_category_manager,sp.menu.category manager,model_sp_menu_category,group_sp_manager,1,1,1,1
+access_sp_order_user,sp.order user,model_sp_order,group_sp_user,1,1,1,0
+access_sp_order_manager,sp.order manager,model_sp_order,group_sp_manager,1,1,1,1
+access_sp_order_line_user,sp.order.line user,model_sp_order_line,group_sp_user,1,1,1,1
+access_sp_campaign_user,sp.campaign user,model_sp_campaign,group_sp_user,1,0,0,0
+access_sp_campaign_manager,sp.campaign manager,model_sp_campaign,group_sp_manager,1,1,1,1
+access_sp_message_user,sp.message user,model_sp_message,group_sp_user,1,1,1,0
+access_sp_message_manager,sp.message manager,model_sp_message,group_sp_manager,1,1,1,1
+access_sp_automation_user,sp.automation user,model_sp_automation,group_sp_user,1,0,0,0
+access_sp_automation_manager,sp.automation manager,model_sp_automation,group_sp_manager,1,1,1,1
+access_sp_alert_user,sp.alert user,model_sp_alert,group_sp_user,1,1,1,0
+access_sp_alert_manager,sp.alert manager,model_sp_alert,group_sp_manager,1,1,1,1
+access_sp_insight_user,sp.insight user,model_sp_insight,group_sp_user,1,1,0,0
+access_sp_insight_manager,sp.insight manager,model_sp_insight,group_sp_manager,1,1,1,1
+access_sp_billing_period_manager,sp.billing.period manager,model_sp_billing_period,group_sp_manager,1,0,0,0
+access_sp_billing_period_admin,sp.billing.period admin,model_sp_billing_period,group_sp_admin,1,1,1,1
+access_sp_send_message_wizard,sp.send.message.wizard,model_sp_send_message_wizard,group_sp_user,1,1,1,1
+access_product_template_sp_user,product.template sp user,product.model_product_template,group_sp_user,1,0,0,0
+access_product_template_sp_manager,product.template sp manager,product.model_product_template,group_sp_manager,1,1,1,1
+access_product_product_sp_user,product.product sp user,product.model_product_product,group_sp_user,1,0,0,0
+access_product_product_sp_manager,product.product sp manager,product.model_product_product,group_sp_manager,1,1,1,1

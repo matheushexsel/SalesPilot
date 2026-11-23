@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_product_template_form_sp" model="ir.ui.view">
+        <field name="name">product.template.form.salespilot</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Cardápio digital" name="salespilot">
+                    <group>
+                        <group>
+                            <field name="sp_restaurant_id"/>
+                            <field name="sp_menu_category_id"/>
+                            <field name="sp_kind"/>
+                            <field name="sp_available"/>
+                            <field name="sp_highlight"/>
+                        </group>
+                        <group>
+                            <field name="sp_serves"/>
+                            <field name="sp_tags"/>
+                            <field name="sp_pair_product_id" domain="[('sp_restaurant_id', '=', sp_restaurant_id)]"/>
+                            <field name="sp_sold_qty_90d"/>
+                            <field name="sp_revenue_90d" widget="monetary"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_sp_menu_item_list" model="ir.ui.view">
+        <field name="name">product.template.sp.menu.list</field>
+        <field name="model">product.template</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <list string="Cardápio" default_order="sp_menu_category_id, name" editable="bottom">
+                <field name="sp_restaurant_id" optional="show"/>
+                <field name="sp_menu_category_id"/>
+                <field name="name"/>
+                <field name="sp_kind"/>
+                <field name="list_price" widget="monetary" string="Preço"/>
+                <field name="sp_available" widget="boolean_toggle"/>
+                <field name="sp_highlight" widget="boolean_toggle"/>
+                <field name="sp_sold_qty_90d"/>
+                <field name="sp_revenue_90d" widget="monetary" sum="Total"/>
+                <field name="sp_pair_product_id" optional="hide"/>
+                <field name="sp_tags" optional="hide"/>
+                <field name="description_sale" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sp_menu_item_kanban" model="ir.ui.view">
+        <field name="name">product.template.sp.menu.kanban</field>
+        <field name="model">product.template</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="sp_menu_category_id">
+                <field name="id"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex">
+                            <field name="image_128" widget="image" class="o_kanban_image me-2" options="{'size': [64, 64]}"/>
+                            <div>
+                                <strong><field name="name"/></strong>
+                                <div><field name="list_price" widget="monetary"/></div>
+                                <div class="text-muted small"><field name="sp_sold_qty_90d"/> vendidos / 90d</div>
+                                <span t-if="!record.sp_available.raw_value" class="badge text-bg-secondary">Indisponível</span>
+                                <span t-if="record.sp_highlight.raw_value" class="badge text-bg-warning">Destaque</span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_sp_menu_items" model="ir.actions.act_window">
+        <field name="name">Cardápio</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('sp_restaurant_id', '!=', False)]</field>
+        <field name="context">{'default_type': 'consu', 'default_sale_ok': True, 'default_purchase_ok': False, 'search_default_groupby_restaurant': 1}</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_sp_menu_item_list')}),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_sp_menu_item_kanban')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('product.product_template_only_form_view')})]"/>
+    </record>
+
+    <record id="view_sp_menu_item_search" model="ir.ui.view">
+        <field name="name">product.template.sp.menu.search</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_search_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <field name="sp_restaurant_id"/>
+                <filter name="groupby_restaurant" string="Restaurante" context="{'group_by': 'sp_restaurant_id'}"/>
+                <filter name="groupby_menu_category" string="Categoria do cardápio" context="{'group_by': 'sp_menu_category_id'}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

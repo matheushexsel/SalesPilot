@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="module_category_salespilot" model="ir.module.category">
+            <field name="name">SalesPilot</field>
+            <field name="description">Acesso ao CRM de retenção para restaurantes</field>
+            <field name="sequence">15</field>
+        </record>
+
+        <record id="group_sp_user" model="res.groups">
+            <field name="name">Operador do restaurante</field>
+            <field name="category_id" ref="module_category_salespilot"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Vê clientes, pedidos e alertas dos restaurantes aos quais tem acesso.</field>
+        </record>
+
+        <record id="group_sp_manager" model="res.groups">
+            <field name="name">Gestor do restaurante</field>
+            <field name="category_id" ref="module_category_salespilot"/>
+            <field name="implied_ids" eval="[(4, ref('group_sp_user'))]"/>
+            <field name="comment">Cria campanhas e réguas, edita o cardápio e vê a fatura.</field>
+        </record>
+
+        <record id="group_sp_admin" model="res.groups">
+            <field name="name">Administrador SalesPilot</field>
+            <field name="category_id" ref="module_category_salespilot"/>
+            <field name="implied_ids" eval="[(4, ref('group_sp_manager')), (4, ref('sales_team.group_sale_salesman'))]"/>
+            <field name="users" eval="[(4, ref('base.user_admin')), (4, ref('base.user_root'))]"/>
+            <field name="comment">Vê todos os restaurantes, a prospecção e o faturamento.</field>
+        </record>
+    </data>
+
+    <data noupdate="1">
+        <!-- Regras: usuário não-admin só enxerga os restaurantes vinculados a ele -->
+        <record id="rule_sp_restaurant_user" model="ir.rule">
+            <field name="name">SalesPilot: restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_restaurant"/>
+            <field name="domain_force">[('user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_restaurant_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todos os restaurantes</field>
+            <field name="model_id" ref="model_sp_restaurant"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+
+        <record id="rule_sp_order_user" model="ir.rule">
+            <field name="name">SalesPilot: pedidos dos restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_order"/>
+            <field name="domain_force">[('restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_order_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todos os pedidos</field>
+            <field name="model_id" ref="model_sp_order"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+
+        <record id="rule_sp_campaign_user" model="ir.rule">
+            <field name="name">SalesPilot: campanhas dos restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_campaign"/>
+            <field name="domain_force">[('restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_campaign_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todas as campanhas</field>
+            <field name="model_id" ref="model_sp_campaign"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+
+        <record id="rule_sp_message_user" model="ir.rule">
+            <field name="name">SalesPilot: mensagens dos restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_message"/>
+            <field name="domain_force">[('restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_message_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todas as mensagens</field>
+            <field name="model_id" ref="model_sp_message"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+
+        <record id="rule_sp_alert_user" model="ir.rule">
+            <field name="name">SalesPilot: alertas dos restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_alert"/>
+            <field name="domain_force">[('restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_alert_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todos os alertas</field>
+            <field name="model_id" ref="model_sp_alert"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+
+        <record id="rule_sp_automation_user" model="ir.rule">
+            <field name="name">SalesPilot: réguas dos restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_automation"/>
+            <field name="domain_force">[('restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_automation_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todas as réguas</field>
+            <field name="model_id" ref="model_sp_automation"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+
+        <record id="rule_sp_insight_user" model="ir.rule">
+            <field name="name">SalesPilot: insights dos restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_insight"/>
+            <field name="domain_force">[('restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_insight_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todos os insights</field>
+            <field name="model_id" ref="model_sp_insight"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+
+        <record id="rule_sp_billing_user" model="ir.rule">
+            <field name="name">SalesPilot: faturas dos restaurantes do usuário</field>
+            <field name="model_id" ref="model_sp_billing_period"/>
+            <field name="domain_force">[('restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_billing_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todas as faturas</field>
+            <field name="model_id" ref="model_sp_billing_period"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+
+        <record id="rule_sp_partner_user" model="ir.rule">
+            <field name="name">SalesPilot: clientes dos restaurantes do usuário</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="domain_force">['|', ('sp_restaurant_id', '=', False), ('sp_restaurant_id.user_ids', 'in', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_user'))]"/>
+        </record>
+        <record id="rule_sp_partner_admin" model="ir.rule">
+            <field name="name">SalesPilot: admin vê todos os clientes</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sp_admin'))]"/>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sp_insight_kanban" model="ir.ui.view">
+        <field name="name">sp.insight.kanban</field>
+        <field name="model">sp.insight</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="kind" quick_create="false" create="false">
+                <field name="priority"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div><field name="priority" widget="priority"/> <strong><field name="name"/></strong></div>
+                        <div class="small text-muted mt-1"><field name="body"/></div>
+                        <div class="mt-2" t-if="record.state.raw_value == 'new'">
+                            <button name="action_apply" type="object" class="btn btn-sm btn-primary"><field name="action_label"/></button>
+                            <button name="action_dismiss" type="object" class="btn btn-sm btn-link">Ignorar</button>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+    <record id="view_sp_insight_list" model="ir.ui.view">
+        <field name="name">sp.insight.list</field>
+        <field name="model">sp.insight</field>
+        <field name="arch" type="xml">
+            <list string="Insights" create="false">
+                <field name="create_date" string="Gerado em"/>
+                <field name="priority" widget="priority"/>
+                <field name="restaurant_id" optional="show"/>
+                <field name="kind"/>
+                <field name="name"/>
+                <field name="metric_value" widget="monetary" sum="Total"/>
+                <field name="action_label"/>
+                <field name="state" widget="badge"/>
+                <button name="action_apply" type="object" icon="fa-magic" title="Aplicar" invisible="state != 'new'"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_sp_insight_form" model="ir.ui.view">
+        <field name="name">sp.insight.form</field>
+        <field name="model">sp.insight</field>
+        <field name="arch" type="xml">
+            <form string="Insight" create="false">
+                <header>
+                    <button name="action_apply" type="object" string="Aplicar sugestão" class="btn-primary" invisible="state != 'new'"/>
+                    <button name="action_dismiss" type="object" string="Ignorar" invisible="state != 'new'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <field name="restaurant_id"/>
+                        <field name="kind"/>
+                        <field name="priority" widget="priority"/>
+                        <field name="metric_value" widget="monetary"/>
+                        <field name="action_label"/>
+                    </group>
+                    <field name="body"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_sp_insights" model="ir.actions.act_window">
+        <field name="name">Insights</field>
+        <field name="res_model">sp.insight</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('state', '=', 'new')]</field>
+    </record>
+</odoo>

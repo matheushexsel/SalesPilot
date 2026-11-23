@@ -1,0 +1,265 @@
+# -*- coding: utf-8 -*-
+"""Cardápio digital público e rastreamento da jornada (link -> cardápio -> pedido)."""
+import json
+import logging
+import secrets
+
+from markupsafe import Markup
+
+from werkzeug.exceptions import NotFound
+
+from odoo import fields, http
+from odoo.http import request
+
+_logger = logging.getLogger(__name__)
+ATTR_COOKIE = "sp_attr"
+PHONE_COOKIE = "sp_phone"
+COOKIE_AGE = 60 * 60 * 24 * 30
+
+
+def _restaurant(slug):
+    rest = request.env["sp.restaurant"].sudo().search([("slug", "=", slug)], limit=1)
+    if not rest:
+        raise NotFound()
+    return rest
+
+
+def _product_payload(tmpl):
+    return {
+        "id": tmpl.id,
+        "product_id": tmpl.product_variant_id.id,
+        "name": tmpl.name,
+        "description": tmpl.description_sale or "",
+        "price": tmpl.list_price,
+        "category_id": tmpl.sp_menu_category_id.id,
+        "kind": tmpl.sp_kind,
+        "highlight": tmpl.sp_highlight,
+        "tags": tmpl.sp_tags or "",
+        "serves": tmpl.sp_serves,
+        "has_image": bool(tmpl.image_128),
+    }
+
+
+class SalesPilotMenu(http.Controller):
+
+    # ------------------------------------------------------------------
+    # Link rastreado das mensagens
+    # ------------------------------------------------------------------
+    @http.route("/c/<string:token>", type="http", auth="public", website=False, sitemap=False)
+    def tracked_link(self, token, **kw):
+        msg = request.env["sp.message"].sudo().search([("tracking_token", "=", token)], limit=1)
+        if not msg:
+            raise NotFound()
+        msg.register_click()
+        response = request.redirect(f"/cardapio/{msg.restaurant_id.slug}?c={token}")
+        response.set_cookie(ATTR_COOKIE, token, max_age=COOKIE_AGE, samesite="Lax")
+        if msg.partner_id.sp_whatsapp:
+            response.set_cookie(PHONE_COOKIE, msg.partner_id.sp_whatsapp, max_age=COOKIE_AGE, samesite="Lax")
+        return response
+
+    # ------------------------------------------------------------------
+    # Página do cardápio
+    # ------------------------------------------------------------------
+    @http.route("/cardapio/<string:slug>", type="http", auth="public", website=False, sitemap=False)
+    def menu_page(self, slug, c=None, **kw):
+        rest = _restaurant(slug)
+        categories = request.env["sp.menu.category"].sudo().search([("restaurant_id", "=", rest.id)])
+        products = request.env["product.template"].sudo().search(
+            [("sp_restaurant_id", "=", rest.id), ("sp_available", "=", True), ("sale_ok", "=", True)],
+            order="sp_highlight desc, sp_sold_qty_90d desc, name")
+        token = c or request.httprequest.cookies.get(ATTR_COOKIE)
+        msg = None
+        if token:
+            msg = request.env["sp.message"].sudo().search([("tracking_token", "=", token)], limit=1)
+        coupon = msg.coupon_code if msg else ""
+        discount_pct = 0.0
+        discount_value = 0.0
+        if msg:
+            src = msg.campaign_id or msg.automation_id
+            if src:
+                discount_pct = src.discount_pct
+                discount_value = src.discount_value
+        known_phone = (msg.partner_id.sp_whatsapp if msg else None) or request.httprequest.cookies.get(PHONE_COOKIE) or ""
+        values = {
+            "rest": rest,
+            "categories": categories,
+            "products": products,
+            "products_json": Markup(json.dumps([_product_payload(p) for p in products]).replace("<", "\\u003c")),
+            "categories_json": Markup(json.dumps([{"id": c.id, "name": c.name} for c in categories]).replace("<", "\\u003c")),
+            "config_json": Markup(json.dumps({"slug": rest.slug, "token": token or "", "delivery_fee": rest.delivery_fee}).replace("<", "\\u003c")),
+            "token": token or "",
+            "coupon": coupon or "",
+            "discount_pct": discount_pct,
+            "discount_value": discount_value,
+            "known_phone": known_phone,
+            "payment_methods": [("pix", "Pix (QR code simulado)"), ("online_card", "Cartão online (simulado)"),
+                                ("apple_pay", "Apple Pay / Google Pay (simulado)"), ("card_delivery", "Cartão na entrega"),
+                                ("cash", "Dinheiro")],
+        }
+        response = request.render("salespilot_restaurant.menu_page", values)
+        if c:
+            response.set_cookie(ATTR_COOKIE, c, max_age=COOKIE_AGE, samesite="Lax")
+        return response
+
+    @http.route("/cardapio/<string:slug>/img/<int:tmpl_id>", type="http", auth="public", website=False, sitemap=False)
+    def menu_image(self, slug, tmpl_id, **kw):
+        rest = _restaurant(slug)
+        tmpl = request.env["product.template"].sudo().browse(tmpl_id)
+        if not tmpl.exists() or tmpl.sp_restaurant_id != rest:
+            raise NotFound()
+        return request.env["ir.binary"]._get_image_stream_from(tmpl, "image_512").get_response()
+
+    # ------------------------------------------------------------------
+    # APIs JSON usadas pela página
+    # ------------------------------------------------------------------
+    @http.route("/cardapio/<string:slug>/api/identify", type="json", auth="public", methods=["POST"], csrf=False)
+    def api_identify(self, slug, phone=None, **kw):
+        rest = _restaurant(slug)
+        env = request.env(su=True)
+        from ..models.res_partner import normalize_phone
+        digits = normalize_phone(phone)
+        partner = env["res.partner"].search([("sp_restaurant_id", "=", rest.id), ("sp_whatsapp_norm", "=", digits)], limit=1) if digits else None
+        engine = env["sp.rfv.engine"]
+        if not partner:
+            best = env["product.template"].search([("sp_restaurant_id", "=", rest.id), ("sp_available", "=", True)],
+                                                  order="sp_sold_qty_90d desc", limit=3)
+            return {"known": False, "greeting": "Bem-vindo(a)! Olha os mais pedidos da casa:",
+                    "recommendations": [{"id": t.id, "name": t.name, "price": t.list_price, "reason": "Mais pedido da casa"} for t in best]}
+        recs = engine.recommend_for_partner(partner)
+        return {
+            "known": True,
+            "name": partner.name,
+            "first_name": (partner.name or "").split(" ")[0],
+            "address": partner.contact_address_inline or partner.street or "",
+            "segment": partner.sp_segment,
+            "greeting": engine.greeting_for_partner(partner),
+            "favorite_id": partner.sp_favorite_product_id.product_tmpl_id.id if partner.sp_favorite_product_id else None,
+            "recommendations": [{"id": r["product"].id, "name": r["product"].name, "price": r["product"].list_price,
+                                 "reason": r["reason"], "kind": r["kind"]} for r in recs],
+        }
+
+    @http.route("/cardapio/<string:slug>/api/suggest", type="json", auth="public", methods=["POST"], csrf=False)
+    def api_suggest(self, slug, items=None, **kw):
+        rest = _restaurant(slug)
+        env = request.env(su=True)
+        tmpl_ids = [int(i["id"]) for i in (items or []) if i.get("id")]
+        if not tmpl_ids:
+            return {"suggestions": []}
+        suggestions = env["sp.rfv.engine"].cross_sell(rest, tmpl_ids, limit=3)
+        out = [{"id": s["product"].id, "name": s["product"].name, "price": s["product"].list_price, "reason": s["reason"]}
+               for s in suggestions]
+        # Regra de upgrade: 2+ principais sem bebida grande -> sugerir bebida 2L / família
+        mains = sum(int(i.get("qty", 1)) for i in items if i.get("kind") == "main")
+        has_big_drink = any(i.get("kind") == "drink" and ("2l" in i.get("name", "").lower() or "1,5" in i.get("name", "").lower()) for i in items)
+        if mains >= 2 and not has_big_drink:
+            big = env["product.template"].search([("sp_restaurant_id", "=", rest.id), ("sp_kind", "=", "drink"),
+                                                  ("sp_available", "=", True), ("name", "ilike", "2L")], limit=1)
+            if big and big.id not in [o["id"] for o in out] and big.id not in tmpl_ids:
+                out.insert(0, {"id": big.id, "name": big.name, "price": big.list_price,
+                               "reason": f"Para {mains} pessoas sai mais em conta que duas latas"})
+        return {"suggestions": out[:3]}
+
+    @http.route("/cardapio/<string:slug>/api/checkout", type="json", auth="public", methods=["POST"], csrf=False)
+    def api_checkout(self, slug, phone=None, name=None, address=None, items=None, payment_method="pix",
+                     notes=None, coupon=None, token=None, recommended_ids=None, birthday=None, **kw):
+        rest = _restaurant(slug)
+        env = request.env(su=True)
+        items = items or []
+        if not items:
+            return {"error": "Carrinho vazio."}
+        if not phone:
+            return {"error": "Informe seu WhatsApp para continuar."}
+        extra = {}
+        if address:
+            extra["street"] = address
+        if birthday:
+            extra["sp_birthday"] = birthday
+        partner = env["res.partner"].sp_find_or_create_customer(rest, phone, name=name, extra=extra)
+        if address and not partner.street:
+            partner.street = address
+        if birthday and not partner.sp_birthday:
+            partner.sp_birthday = birthday
+
+        Template = env["product.template"]
+        lines = []
+        subtotal = 0.0
+        recommended_ids = set(int(x) for x in (recommended_ids or []))
+        for it in items:
+            tmpl = Template.browse(int(it["id"]))
+            if not tmpl.exists() or tmpl.sp_restaurant_id != rest:
+                continue
+            qty = max(float(it.get("qty", 1)), 1.0)
+            subtotal += qty * tmpl.list_price
+            lines.append((0, 0, {"product_id": tmpl.product_variant_id.id, "qty": qty, "price_unit": tmpl.list_price,
+                                 "notes": it.get("notes") or False, "recommended": tmpl.id in recommended_ids}))
+        if not lines:
+            return {"error": "Itens inválidos."}
+        if subtotal < (rest.min_order or 0):
+            return {"error": f"Pedido mínimo de R$ {rest.min_order:.2f}".replace(".", ",")}
+
+        token = token or request.httprequest.cookies.get(ATTR_COOKIE)
+        msg = env["sp.message"].search([("tracking_token", "=", token)], limit=1) if token else env["sp.message"]
+        discount = 0.0
+        campaign = msg.campaign_id if msg else env["sp.campaign"]
+        automation = msg.automation_id if msg else env["sp.automation"]
+        coupon = (coupon or "").strip().upper()
+        if coupon:
+            src = None
+            if campaign and (campaign.coupon_code or "").upper() == coupon:
+                src = campaign
+            elif automation and (automation.coupon_code or "").upper() == coupon:
+                src = automation
+            else:
+                src = env["sp.campaign"].search([("restaurant_id", "=", rest.id), ("coupon_code", "=ilike", coupon),
+                                                 ("state", "in", ("scheduled", "sending", "sent", "done"))], limit=1) \
+                    or env["sp.automation"].search([("restaurant_id", "=", rest.id), ("coupon_code", "=ilike", coupon)], limit=1)
+                if src and src._name == "sp.campaign" and not campaign:
+                    campaign = src
+                elif src and src._name == "sp.automation" and not automation:
+                    automation = src
+            if src:
+                discount = subtotal * (src.discount_pct or 0) / 100.0 + (src.discount_value or 0.0)
+            else:
+                return {"error": "Cupom inválido ou expirado."}
+
+        order = env["sp.order"].create({
+            "restaurant_id": rest.id,
+            "partner_id": partner.id,
+            "channel": "menu",
+            "state": "confirmed",
+            "payment_method": payment_method,
+            "payment_status": "paid" if payment_method in ("pix", "online_card", "apple_pay") else "pending",
+            "delivery_fee": rest.delivery_fee,
+            "discount_amount": min(discount, subtotal),
+            "delivery_address": address or partner.street or "",
+            "customer_notes": notes or False,
+            "coupon_code": coupon or False,
+            "campaign_id": campaign.id if campaign else False,
+            "automation_id": automation.id if automation else False,
+            "message_id": msg.id if msg else False,
+            "recommendation_accepted": bool(recommended_ids),
+            "line_ids": lines,
+        })
+        payment_info = {}
+        if payment_method == "pix":
+            payment_info = {"kind": "pix", "code": "00020126580014BR.GOV.BCB.PIX0136" + secrets.token_hex(16) + "5204000053039865802BR",
+                            "note": "Pagamento simulado no piloto: o pedido já foi registrado como pago."}
+        elif payment_method in ("online_card", "apple_pay"):
+            payment_info = {"kind": payment_method, "note": "Pagamento simulado no piloto (gateway não integrado)."}
+        else:
+            payment_info = {"kind": payment_method, "note": "Pague na entrega."}
+        response_vals = {
+            "order_id": order.id, "name": order.name, "total": order.amount_total, "subtotal": order.amount_subtotal,
+            "discount": order.discount_amount, "delivery_fee": order.delivery_fee,
+            "eta_minutes": rest.avg_prep_minutes, "payment": payment_info, "attributed": order.attributed,
+            "status_url": f"/cardapio/{rest.slug}/pedido/{order.id}/{order.tracking_token}",
+        }
+        return response_vals
+
+    @http.route("/cardapio/<string:slug>/pedido/<int:order_id>/<string:token>", type="http", auth="public", website=False, sitemap=False)
+    def order_status(self, slug, order_id, token, **kw):
+        rest = _restaurant(slug)
+        order = request.env["sp.order"].sudo().browse(order_id)
+        if not order.exists() or order.restaurant_id != rest or order.tracking_token != token:
+            raise NotFound()
+        return request.render("salespilot_restaurant.order_status_page", {"rest": rest, "order": order})

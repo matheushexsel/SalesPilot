@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_crm_lead_form_sp" model="ir.ui.view">
+        <field name="name">crm.lead.form.salespilot</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.crm_lead_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_sp_qualify" type="object" string="✨ Qualificar prospect" invisible="not sp_is_restaurant"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Prospecção de restaurante" name="salespilot_prospect">
+                    <group>
+                        <group string="Perfil do restaurante">
+                            <field name="sp_is_restaurant"/>
+                            <field name="sp_segment"/>
+                            <field name="sp_neighborhood"/>
+                            <field name="sp_instagram"/>
+                            <field name="sp_instagram_followers"/>
+                        </group>
+                        <group string="Presença digital">
+                            <field name="sp_google_rating"/>
+                            <field name="sp_google_reviews"/>
+                            <field name="sp_on_ifood"/>
+                            <field name="sp_ifood_rating"/>
+                            <field name="sp_has_own_menu"/>
+                            <field name="sp_uses_whatsapp_orders"/>
+                        </group>
+                        <group string="Potencial">
+                            <field name="sp_monthly_orders_est"/>
+                            <field name="sp_avg_ticket_est"/>
+                            <field name="sp_potential_mrr"/>
+                            <field name="sp_qualification_score" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <field name="sp_qualification_notes" readonly="1"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_crm_lead_list_sp" model="ir.ui.view">
+        <field name="name">crm.lead.list.salespilot</field>
+        <field name="model">crm.lead</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <list string="Prospects" default_order="sp_qualification_score desc">
+                <field name="name"/>
+                <field name="sp_segment"/>
+                <field name="city"/>
+                <field name="sp_neighborhood"/>
+                <field name="sp_google_rating"/>
+                <field name="sp_google_reviews"/>
+                <field name="sp_on_ifood"/>
+                <field name="sp_monthly_orders_est"/>
+                <field name="sp_qualification_score" widget="progressbar"/>
+                <field name="sp_potential_mrr" widget="monetary" sum="MRR potencial"/>
+                <field name="stage_id"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_sp_prospects" model="ir.actions.act_window">
+        <field name="name">Prospecção de restaurantes</field>
+        <field name="res_model">crm.lead</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('sp_is_restaurant', '=', True), ('type', '=', 'opportunity')]</field>
+        <field name="context">{'default_sp_is_restaurant': True, 'default_type': 'opportunity'}</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('crm.crm_case_kanban_view_leads')}),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_crm_lead_list_sp')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('crm.crm_lead_view_form')})]"/>
+    </record>
+</odoo>

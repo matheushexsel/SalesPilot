@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+<t t-name="salespilot_restaurant.Dashboard">
+    <div class="o_sp_dashboard p-3">
+        <t t-if="state.loading and !state.data">
+            <div class="text-center p-5 text-muted">Carregando...</div>
+        </t>
+        <t t-elif="!state.data or !state.data.restaurant">
+            <div class="alert alert-warning">Nenhum restaurante vinculado ao seu usuário. Peça ao administrador para liberar o acesso.</div>
+        </t>
+        <t t-else="">
+            <t t-set="d" t-value="state.data"/>
+            <!-- Cabeçalho -->
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <h2 class="mb-0 me-2">📊 <t t-esc="d.restaurant.name"/></h2>
+                <select class="form-select w-auto" t-if="d.restaurants.length > 1" t-on-change="onRestaurantChange">
+                    <t t-foreach="d.restaurants" t-as="r" t-key="r.id">
+                        <option t-att-value="r.id" t-att-selected="r.id === state.restaurantId"><t t-esc="r.name"/></option>
+                    </t>
+                </select>
+                <span class="text-muted small" t-if="d.restaurant.last_rfv_run">RFV atualizado em <t t-esc="d.restaurant.last_rfv_run"/></span>
+                <div class="ms-auto d-flex gap-2">
+                    <button class="btn btn-outline-secondary btn-sm" t-on-click="openMenu">🍽️ Cardápio digital</button>
+                    <button class="btn btn-outline-secondary btn-sm" t-on-click="() => this.newCampaign('manual')">📣 Nova campanha</button>
+                    <button class="btn btn-primary btn-sm" t-on-click="recompute" t-att-disabled="state.loading">↻ Recalcular</button>
+                </div>
+            </div>
+
+            <!-- KPIs -->
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-4 col-xl-2"><div class="o_sp_kpi" t-on-click="() => this.openOrders([], 'Pedidos')">
+                    <div class="o_sp_kpi_label">Receita 30 dias</div>
+                    <div class="o_sp_kpi_value"><t t-esc="brl(k.revenue_30d)"/></div>
+                    <div class="small" t-att-class="trendClass(delta(k.revenue_30d, k.revenue_prev_30d))"><t t-esc="trendText(delta(k.revenue_30d, k.revenue_prev_30d))"/></div>
+                </div></div>
+                <div class="col-6 col-md-4 col-xl-2"><div class="o_sp_kpi">
+                    <div class="o_sp_kpi_label">Pedidos 30 dias</div>
+                    <div class="o_sp_kpi_value"><t t-esc="k.orders_30d"/></div>
+                    <div class="small text-muted">ticket médio <t t-esc="brl(k.avg_ticket_30d)"/></div>
+                </div></div>
+                <div class="col-6 col-md-4 col-xl-2"><div class="o_sp_kpi" t-on-click="() => this.openCustomers([], 'Clientes')">
+                    <div class="o_sp_kpi_label">Clientes ativos (30d)</div>
+                    <div class="o_sp_kpi_value"><t t-esc="k.active_customers_30d"/></div>
+                    <div class="small text-muted">de <t t-esc="k.total_customers"/> na base · <t t-esc="k.opt_in"/> com opt-in</div>
+                </div></div>
+                <div class="col-6 col-md-4 col-xl-2"><div class="o_sp_kpi">
+                    <div class="o_sp_kpi_label">Retenção mensal</div>
+                    <div class="o_sp_kpi_value"><t t-esc="pct(k.retention_rate)"/></div>
+                    <div class="small text-muted">voltaram a comprar neste mês</div>
+                </div></div>
+                <div class="col-6 col-md-4 col-xl-2"><div class="o_sp_kpi o_sp_kpi_danger" t-on-click="openRisk">
+                    <div class="o_sp_kpi_label">🚩 Red flags</div>
+                    <div class="o_sp_kpi_value"><t t-esc="k.at_risk"/></div>
+                    <div class="small text-muted"><t t-esc="k.critical"/> em nível crítico</div>
+                </div></div>
+                <div class="col-6 col-md-4 col-xl-2"><div class="o_sp_kpi o_sp_kpi_info" t-on-click="openNew">
+                    <div class="o_sp_kpi_label">Novos clientes (30d)</div>
+                    <div class="o_sp_kpi_value"><t t-esc="k.new_customers_30d"/></div>
+                    <div class="small text-muted">primeira compra no período</div>
+                </div></div>
+            </div>
+
+            <div class="row g-3">
+                <!-- Coluna esquerda -->
+                <div class="col-12 col-xl-8">
+                    <div class="o_sp_card mb-3">
+                        <div class="d-flex justify-content-between"><h5>Receita por semana (12 semanas)</h5></div>
+                        <div style="height: 220px"><canvas t-ref="weekChart"/></div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-6">
+                            <div class="o_sp_card h-100">
+                                <h5>Matriz RFV <small class="text-muted">(Recência × Frequência/Valor)</small></h5>
+                                <div class="o_sp_matrix">
+                                    <div class="o_sp_matrix_corner"></div>
+                                    <t t-foreach="[1,2,3,4,5]" t-as="fv" t-key="fv"><div class="o_sp_matrix_head">FV <t t-esc="fv"/></div></t>
+                                    <t t-foreach="d.matrix" t-as="row" t-key="row_index">
+                                        <div class="o_sp_matrix_head">R <t t-esc="5 - row_index"/></div>
+                                        <t t-foreach="row" t-as="cell" t-key="cell_index">
+                                            <div class="o_sp_matrix_cell" t-att-style="'background:' + matrixColor(cell)"
+                                                 t-att-class="cell > 0 ? 'o_sp_clickable' : ''"
+                                                 t-on-click="() => cell > 0 ? this.openCustomers([['sp_r_score','=', 5 - row_index]], 'Clientes R' + (5 - row_index)) : null">
+                                                <t t-esc="cell"/>
+                                            </div>
+                                        </t>
+                                    </t>
+                                </div>
+                                <div class="small text-muted mt-2">R alto = comprou há pouco. FV alto = compra muito e gasta muito. Canto superior direito são os Campeões; canto inferior direito, os que você não pode perder.</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <div class="o_sp_card h-100">
+                                <h5>Segmentos</h5>
+                                <table class="table table-sm mb-0 o_sp_table">
+                                    <tbody>
+                                        <t t-foreach="d.segments" t-as="s" t-key="s.code">
+                                            <tr t-if="s.count" class="o_sp_clickable" t-on-click="() => this.openSegment(s)" t-att-title="s.tip">
+                                                <td><span class="o_sp_dot" t-att-style="'background:' + s.color"/> <t t-esc="s.label"/></td>
+                                                <td class="text-end"><t t-esc="s.count"/></td>
+                                                <td class="text-end text-muted"><t t-esc="brl(s.revenue)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-0">
+                        <div class="col-12 col-lg-7">
+                            <div class="o_sp_card h-100">
+                                <h5>Quando seus clientes pedem <small class="text-muted">(90 dias)</small></h5>
+                                <div class="o_sp_heat">
+                                    <div></div>
+                                    <t t-foreach="HOURS" t-as="h" t-key="h"><div class="o_sp_heat_head"><t t-esc="h"/>h</div></t>
+                                    <t t-foreach="d.weekday_short" t-as="wd" t-key="wd_index">
+                                        <div class="o_sp_heat_head"><t t-esc="wd"/></div>
+                                        <t t-foreach="HOURS" t-as="h" t-key="h">
+                                            <div class="o_sp_heat_cell" t-att-style="'background:' + heatColor(heatValue(wd_index, h))" t-att-title="wd + ' ' + h + 'h: ' + heatValue(wd_index, h) + ' pedidos'"></div>
+                                        </t>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-5">
+                            <div class="o_sp_card h-100">
+                                <h5>Canais <small class="text-muted">(90 dias)</small></h5>
+                                <div style="height: 180px"><canvas t-ref="channelChart"/></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="o_sp_card mt-3">
+                        <div class="d-flex justify-content-between align-items-center"><h5 class="mb-0">Campanhas recentes</h5>
+                            <button class="btn btn-link btn-sm" t-on-click="() => this.newCampaign('reactivation')">+ Reativação</button></div>
+                        <table class="table table-sm mt-2 mb-0 o_sp_table">
+                            <thead><tr><th>Campanha</th><th>Canal</th><th class="text-end">Enviadas</th><th class="text-end">Cliques</th><th class="text-end">Pedidos</th><th class="text-end">Conv.</th><th class="text-end">Receita</th><th class="text-end">ROI</th></tr></thead>
+                            <tbody>
+                                <tr t-if="!d.campaigns.length"><td colspan="8" class="text-muted">Nenhuma campanha enviada ainda.</td></tr>
+                                <t t-foreach="d.campaigns" t-as="c" t-key="c.id">
+                                    <tr class="o_sp_clickable" t-on-click="() => this.openCampaign(c)">
+                                        <td><t t-esc="c.name"/> <span class="badge text-bg-light"><t t-esc="c.state"/></span></td>
+                                        <td><t t-esc="c.channel"/></td>
+                                        <td class="text-end"><t t-esc="c.sent"/></td>
+                                        <td class="text-end"><t t-esc="c.clicks"/></td>
+                                        <td class="text-end"><t t-esc="c.orders"/></td>
+                                        <td class="text-end"><t t-esc="pct(c.conversion, 1)"/></td>
+                                        <td class="text-end"><t t-esc="brl(c.revenue)"/></td>
+                                        <td class="text-end"><t t-esc="c.roi ? c.roi.toFixed(0) + '×' : '—'"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Coluna direita -->
+                <div class="col-12 col-xl-4">
+                    <div class="o_sp_card mb-3">
+                        <h5>✨ Insights</h5>
+                        <t t-if="!d.insights.length"><div class="text-muted small">Clique em Recalcular para gerar insights.</div></t>
+                        <t t-foreach="d.insights" t-as="i" t-key="i.id">
+                            <div class="o_sp_insight" t-att-class="'o_sp_prio_' + i.priority">
+                                <div class="fw-bold"><t t-esc="i.title"/></div>
+                                <div class="small text-muted mt-1"><t t-esc="i.body"/></div>
+                                <div class="mt-2 d-flex gap-2">
+                                    <button class="btn btn-sm btn-primary" t-on-click="() => this.applyInsight(i)"><t t-esc="i.action_label || 'Aplicar'"/></button>
+                                    <button class="btn btn-sm btn-link text-muted" t-on-click="() => this.dismissInsight(i)">Ignorar</button>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+
+                    <div class="o_sp_card mb-3">
+                        <div class="d-flex justify-content-between align-items-center"><h5 class="mb-0">🚩 Alertas abertos</h5>
+                            <button class="btn btn-link btn-sm" t-on-click="openAlerts">ver todos</button></div>
+                        <t t-if="!d.alerts.length"><div class="text-muted small mt-2">Nenhum alerta aberto. 🎉</div></t>
+                        <t t-foreach="d.alerts" t-as="a" t-key="a.id">
+                            <div class="o_sp_alert" t-att-class="'o_sp_sev_' + a.severity">
+                                <div class="d-flex justify-content-between">
+                                    <a href="#" class="fw-bold" t-on-click.prevent="() => this.openPartner(a.partner_id)"><t t-esc="a.partner"/></a>
+                                    <span class="badge text-bg-light"><t t-esc="a.type_label"/></span>
+                                </div>
+                                <div class="small"><t t-esc="a.title"/></div>
+                                <div class="small text-muted"><t t-esc="a.suggestion"/></div>
+                                <div class="mt-1 d-flex gap-2">
+                                    <button class="btn btn-sm btn-success" t-on-click="() => this.sendAlertMessage(a)">💬 Enviar WhatsApp</button>
+                                    <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.openAlert(a)">Abrir</button>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+
+                    <div class="o_sp_card mb-3" t-if="d.birthdays.length">
+                        <h5>🎂 Aniversários da semana</h5>
+                        <t t-foreach="d.birthdays" t-as="b" t-key="b.id">
+                            <div class="d-flex justify-content-between small py-1 border-bottom">
+                                <a href="#" t-on-click.prevent="() => this.openPartner(b.id)"><t t-esc="b.name"/></a>
+                                <span class="text-muted"><t t-esc="b.in_days === 0 ? 'hoje' : 'em ' + b.in_days + ' dia(s)'"/></span>
+                            </div>
+                        </t>
+                    </div>
+
+                    <div class="o_sp_card mb-3">
+                        <h5>🏆 Mais vendidos <small class="text-muted">(90 dias)</small></h5>
+                        <table class="table table-sm mb-0 o_sp_table">
+                            <tbody>
+                                <t t-foreach="d.top_products" t-as="p" t-key="p.id">
+                                    <tr><td><t t-esc="p.name"/></td><td class="text-end"><t t-esc="p.sp_sold_qty_90d"/></td><td class="text-end text-muted"><t t-esc="brl(p.sp_revenue_90d)"/></td></tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="o_sp_card o_sp_plan">
+                        <h5>💸 Seu plano SalesPilot — mês atual</h5>
+                        <div class="d-flex justify-content-between small"><span>Receita do mês</span><strong><t t-esc="brl(k.revenue_month)"/></strong></div>
+                        <div class="d-flex justify-content-between small o_sp_clickable" t-on-click="() => this.openOrders([['tracked','=',true]], 'Pedidos rastreados')"><span>Rastreada pela jornada SalesPilot</span><strong><t t-esc="brl(k.tracked_month)"/></strong></div>
+                        <div class="d-flex justify-content-between small o_sp_clickable" t-on-click="() => this.openOrders([['attributed','=',true]], 'Pedidos de campanhas')"><span>Atribuída a campanhas/réguas</span><strong><t t-esc="brl(k.attributed_month)"/></strong></div>
+                        <div class="d-flex justify-content-between small"><span>Com recomendação aceita</span><strong><t t-esc="brl(k.recommendation_month)"/></strong></div>
+                        <hr class="my-2"/>
+                        <div class="d-flex justify-content-between small"><span>Mensalidade</span><span><t t-esc="brl(k.monthly_fee)"/></span></div>
+                        <div class="d-flex justify-content-between small"><span>Taxa de sucesso (<t t-esc="k.fee_pct"/>% da rastreada)</span><span><t t-esc="brl(k.success_fee)"/></span></div>
+                        <div class="d-flex justify-content-between fw-bold"><span>Total estimado</span><span><t t-esc="brl(k.success_fee + k.monthly_fee)"/></span></div>
+                        <div class="small text-success mt-2">No marketplace (~<t t-esc="k.marketplace_pct"/>%) esse volume custaria <t t-esc="brl(k.marketplace_cost)"/>. Economia: <strong><t t-esc="brl(k.savings)"/></strong>.</div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </div>
+</t>
+</templates>

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<template id="menu_page" name="Cardápio digital SalesPilot">
+<t t-set="primary" t-value="rest.color_primary or '#E63946'"/>
+&lt;!DOCTYPE html&gt;
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title><t t-out="rest.name"/> · Cardápio</title>
+    <link rel="stylesheet" href="/salespilot_restaurant/static/src/menu/menu.css"/>
+    <style>:root { --p: <t t-out="primary"/>; }</style>
+</head>
+<body>
+    <header>
+        <div class="top">
+            <img t-if="rest.logo" t-att-src="'data:image/png;base64,' + rest.logo.decode()" alt=""/>
+            <div t-else="" class="ph" style="width:64px;height:64px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;">🍽️</div>
+            <div>
+                <h1><t t-out="rest.name"/></h1>
+                <p><t t-out="rest.tagline or 'Peça direto, sem taxa de marketplace.'"/></p>
+            </div>
+        </div>
+        <div class="wrap">
+            <div class="info">
+                <span>🕒 <t t-out="rest.opening_hours"/></span>
+                <span>🛵 Entrega R$ <t t-out="'%.2f' % rest.delivery_fee"/></span>
+                <span>⏱️ ~<t t-out="rest.avg_prep_minutes"/> min</span>
+                <span>Mínimo R$ <t t-out="'%.2f' % rest.min_order"/></span>
+            </div>
+        </div>
+    </header>
+
+    <div class="wrap">
+        <div class="identify" id="identify">
+            <span style="font-size:22px">👋</span>
+            <input type="tel" id="phone" placeholder="Seu WhatsApp (DDD + número)" t-att-value="known_phone"/>
+            <button class="btn" id="btn-identify">Ver sugestões pra mim</button>
+            <div class="muted" style="flex-basis:100%" id="identify-hint">Identifique-se para receber recomendações com base nos seus pedidos.</div>
+        </div>
+        <div class="coupon" t-if="coupon">
+            🎟️ Cupom <strong><t t-out="coupon"/></strong> aplicado no checkout
+            <t t-if="discount_pct">(<t t-out="'%g' % discount_pct"/>% de desconto)</t>
+            <t t-if="discount_value">(R$ <t t-out="'%.2f' % discount_value"/> de desconto)</t>.
+        </div>
+
+        <nav class="cats" id="cats"></nav>
+        <div id="menu"></div>
+        <div class="footer">Cardápio digital por <strong>SalesPilot</strong> · pedidos rastreados, zero comissão de marketplace</div>
+    </div>
+
+    <div class="cartbar" id="cartbar">
+        <div class="inner">
+            <div><strong id="cart-count">0</strong> item(ns) · <strong id="cart-total">R$ 0,00</strong></div>
+            <button class="btn" id="btn-cart">Ver sacola</button>
+        </div>
+    </div>
+
+    <!-- Pop-up de recomendação personalizada -->
+    <div class="modal-bg" id="rec-modal">
+        <div class="modal">
+            <h3 id="rec-title">Olá!</h3>
+            <div id="rec-list"></div>
+            <div style="display:flex; gap:8px; margin-top:14px;">
+                <button class="btn sec" id="rec-close">Ver cardápio completo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sacola / checkout -->
+    <div class="modal-bg" id="cart-modal">
+        <div class="modal">
+            <div id="checkout-view">
+                <h3>Sua sacola</h3>
+                <div id="cart-lines"></div>
+                <div class="sugg" id="sugg-box" style="display:none">
+                    <strong>✨ Que tal completar?</strong>
+                    <div id="sugg-list"></div>
+                </div>
+                <label>Nome</label><input type="text" id="f-name" placeholder="Como quer ser chamado"/>
+                <label>WhatsApp</label><input type="tel" id="f-phone" placeholder="(11) 99999-9999" t-att-value="known_phone"/>
+                <label>Endereço de entrega</label><input type="text" id="f-address" placeholder="Rua, número, complemento"/>
+                <label>Aniversário (opcional, para ganhar mimo 🎂)</label><input type="date" id="f-birthday"/>
+                <label>Pagamento</label>
+                <div class="pay">
+                    <t t-foreach="payment_methods" t-as="pm">
+                        <label><input type="radio" name="pay" t-att-value="pm[0]" t-att-checked="'checked' if pm[0] == 'pix' else None"/> <t t-out="pm[1]"/></label>
+                    </t>
+                </div>
+                <label>Cupom</label><input type="text" id="f-coupon" t-att-value="coupon" placeholder="Tem cupom?"/>
+                <label>Observações</label><textarea id="f-notes" rows="2" placeholder="Sem cebola, ponto da carne..."></textarea>
+                <div class="line"><span>Subtotal</span><span id="c-sub"></span></div>
+                <div class="line"><span>Entrega</span><span>R$ <t t-out="('%.2f' % rest.delivery_fee).replace('.', ',')"/></span></div>
+                <div class="total"><span>Total</span><span id="c-total"></span></div>
+                <div class="err" id="c-err"></div>
+                <div style="display:flex; gap:8px; margin-top:14px;">
+                    <button class="btn sec" id="cart-close">Continuar comprando</button>
+                    <button class="btn" id="btn-checkout" style="flex:1">Fazer pedido</button>
+                </div>
+            </div>
+            <div id="success-view" style="display:none" class="success"></div>
+        </div>
+    </div>
+
+    <script type="application/json" id="sp-products"><t t-out="products_json"/></script>
+    <script type="application/json" id="sp-categories"><t t-out="categories_json"/></script>
+    <script type="application/json" id="sp-config"><t t-out="config_json"/></script>
+    <script src="/salespilot_restaurant/static/src/menu/menu.js"></script>
+</body>
+</html>
+</template>
+
+<template id="order_status_page" name="Status do pedido">
+&lt;!DOCTYPE html&gt;
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Pedido <t t-out="order.name"/></title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:#f6f6f7; margin:0; padding: 24px 16px; color:#1d1d1f; }
+        .box { max-width: 520px; margin:0 auto; background:#fff; border-radius: 16px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+        .steps { display:flex; gap:6px; margin: 16px 0; }
+        .steps div { flex:1; height: 8px; border-radius: 4px; background:#e5e7eb; }
+        .steps div.on { background: <t t-out="rest.color_primary or '#E63946'"/>; }
+        .line { display:flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+        a { color: <t t-out="rest.color_primary or '#E63946'"/>; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2 style="margin:0"><t t-out="rest.name"/></h2>
+        <p>Pedido <strong><t t-out="order.name"/></strong> · <t t-out="dict(order._fields['state'].selection).get(order.state)"/></p>
+        <t t-set="order_steps" t-value="['confirmed', 'preparing', 'delivering', 'delivered']"/>
+        <t t-set="idx" t-value="order_steps.index(order.state) if order.state in order_steps else -1"/>
+        <div class="steps">
+            <t t-foreach="range(4)" t-as="i"><div t-att-class="'on' if i &lt;= idx else ''"></div></t>
+        </div>
+        <t t-foreach="order.line_ids" t-as="l">
+            <div class="line"><span><t t-out="int(l.qty)"/>x <t t-out="l.product_id.name"/></span><span>R$ <t t-out="('%.2f' % l.price_subtotal).replace('.', ',')"/></span></div>
+        </t>
+        <div class="line"><span>Entrega</span><span>R$ <t t-out="('%.2f' % order.delivery_fee).replace('.', ',')"/></span></div>
+        <div class="line" t-if="order.discount_amount"><span>Desconto</span><span>- R$ <t t-out="('%.2f' % order.discount_amount).replace('.', ',')"/></span></div>
+        <div class="line"><strong>Total</strong><strong>R$ <t t-out="('%.2f' % order.amount_total).replace('.', ',')"/></strong></div>
+        <p style="margin-top:16px"><a t-att-href="'/cardapio/' + rest.slug">← Voltar ao cardápio</a></p>
+    </div>
+</body>
+</html>
+</template>
+</odoo>

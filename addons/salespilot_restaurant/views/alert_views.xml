@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sp_alert_form" model="ir.ui.view">
+        <field name="name">sp.alert.form</field>
+        <field name="model">sp.alert</field>
+        <field name="arch" type="xml">
+            <form string="Alerta">
+                <header>
+                    <button name="action_send_message" type="object" string="Enviar WhatsApp" class="btn-primary" invisible="state != 'open'"/>
+                    <button name="action_open_partner" type="object" string="Abrir cliente"/>
+                    <button name="action_done" type="object" string="Resolvido" invisible="state != 'open'"/>
+                    <button name="action_dismiss" type="object" string="Ignorar" invisible="state != 'open'"/>
+                    <button name="action_reopen" type="object" string="Reabrir" invisible="state == 'open'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="restaurant_id"/>
+                            <field name="partner_id"/>
+                            <field name="partner_whatsapp"/>
+                            <field name="alert_type"/>
+                            <field name="severity" widget="priority"/>
+                        </group>
+                        <group>
+                            <field name="partner_segment"/>
+                            <field name="partner_recency"/>
+                            <field name="partner_ltv" widget="monetary"/>
+                            <field name="automation_id"/>
+                            <field name="message_id"/>
+                            <field name="resolution"/>
+                            <field name="date_resolved"/>
+                        </group>
+                    </group>
+                    <group string="Detalhes">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                    <group string="Ação sugerida">
+                        <field name="suggestion" nolabel="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sp_alert_list" model="ir.ui.view">
+        <field name="name">sp.alert.list</field>
+        <field name="model">sp.alert</field>
+        <field name="arch" type="xml">
+            <list string="Alertas" decoration-danger="severity == '3' and state == 'open'" decoration-warning="severity == '2' and state == 'open'" decoration-muted="state != 'open'">
+                <field name="create_date" string="Data"/>
+                <field name="severity" widget="priority"/>
+                <field name="restaurant_id" optional="show"/>
+                <field name="alert_type"/>
+                <field name="partner_id"/>
+                <field name="name"/>
+                <field name="partner_recency"/>
+                <field name="partner_ltv" widget="monetary"/>
+                <field name="state" widget="badge" decoration-warning="state == 'open'" decoration-success="state == 'done'"/>
+                <button name="action_send_message" type="object" icon="fa-whatsapp" title="Enviar WhatsApp" invisible="state != 'open'"/>
+                <button name="action_done" type="object" icon="fa-check" title="Resolvido" invisible="state != 'open'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sp_alert_kanban" model="ir.ui.view">
+        <field name="name">sp.alert.kanban</field>
+        <field name="model">sp.alert</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="alert_type" quick_create="false">
+                <field name="severity"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div><strong><field name="partner_id"/></strong> <field name="severity" widget="priority"/></div>
+                        <div class="small"><field name="name"/></div>
+                        <div class="small text-muted mt-1"><field name="suggestion"/></div>
+                        <div class="mt-2">
+                            <button name="action_send_message" type="object" class="btn btn-sm btn-primary" t-if="record.state.raw_value == 'open'">Enviar WhatsApp</button>
+                            <button name="action_done" type="object" class="btn btn-sm btn-secondary ms-1" t-if="record.state.raw_value == 'open'">Resolvido</button>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_sp_alert_search" model="ir.ui.view">
+        <field name="name">sp.alert.search</field>
+        <field name="model">sp.alert</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="partner_id"/>
+                <field name="name"/>
+                <filter name="open" string="Abertos" domain="[('state', '=', 'open')]"/>
+                <filter name="high" string="Alta prioridade" domain="[('severity', '=', '3')]"/>
+                <filter name="churn" string="Red flags" domain="[('alert_type', 'in', ('churn_warning', 'churn_critical', 'cant_lose'))]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_type" string="Tipo" context="{'group_by': 'alert_type'}"/>
+                    <filter name="group_restaurant" string="Restaurante" context="{'group_by': 'restaurant_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_sp_alerts" model="ir.actions.act_window">
+        <field name="name">Alertas e red flags</field>
+        <field name="res_model">sp.alert</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_sp_alert_search"/>
+        <field name="context">{'search_default_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nenhum alerta aberto</p>
+            <p>Os alertas aparecem quando um cliente ativo reduz a recorrência, quando um campeão some
+               ou quando há aniversário chegando.</p>
+        </field>
+    </record>
+</odoo>

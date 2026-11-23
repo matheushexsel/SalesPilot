@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_sp" model="ir.ui.view">
+        <field name="name">res.partner.form.salespilot</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_sp_orders" type="object" class="oe_stat_button" icon="fa-shopping-bag"
+                        invisible="not sp_is_customer">
+                    <field name="sp_order_count" widget="statinfo" string="Pedidos"/>
+                </button>
+                <button name="action_sp_send_message" type="object" class="oe_stat_button" icon="fa-whatsapp"
+                        invisible="not sp_is_customer">
+                    <field name="sp_message_count" widget="statinfo" string="Mensagens"/>
+                </button>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="SalesPilot" name="salespilot" invisible="not sp_is_customer and not sp_restaurant_id">
+                    <div class="alert alert-info" role="alert" invisible="not sp_profile_summary">
+                        <field name="sp_profile_summary" nolabel="1"/>
+                    </div>
+                    <group>
+                        <group string="Cadastro">
+                            <field name="sp_restaurant_id"/>
+                            <field name="sp_is_customer"/>
+                            <field name="sp_whatsapp"/>
+                            <field name="sp_birthday"/>
+                            <field name="sp_opt_in"/>
+                            <field name="sp_source"/>
+                            <field name="sp_tags"/>
+                            <field name="sp_delivery_notes"/>
+                        </group>
+                        <group string="Matriz RFV">
+                            <field name="sp_segment" widget="badge" decoration-success="sp_segment in ('champions','loyal')"
+                                   decoration-danger="sp_segment in ('at_risk','cant_lose','lost')"
+                                   decoration-warning="sp_segment in ('need_attention','about_to_sleep','hibernating')"
+                                   decoration-info="sp_segment in ('new','promising','potential_loyal')"/>
+                            <field name="sp_rfv_score"/>
+                            <field name="sp_r_score"/>
+                            <field name="sp_f_score"/>
+                            <field name="sp_v_score"/>
+                            <field name="sp_segment_prev"/>
+                            <field name="sp_churn_risk" widget="badge" decoration-danger="sp_churn_risk == 'critical'"
+                                   decoration-warning="sp_churn_risk == 'warning'"/>
+                            <field name="sp_recurrence_ratio" widget="float" digits="[16,2]"/>
+                        </group>
+                        <group string="Histórico">
+                            <field name="sp_first_order_date"/>
+                            <field name="sp_last_order_date"/>
+                            <field name="sp_recency_days"/>
+                            <field name="sp_total_orders"/>
+                            <field name="sp_frequency"/>
+                            <field name="sp_monetary" widget="monetary"/>
+                            <field name="sp_ltv" widget="monetary"/>
+                            <field name="sp_avg_ticket" widget="monetary"/>
+                        </group>
+                        <group string="Perfil de consumo">
+                            <field name="sp_favorite_product_id"/>
+                            <field name="sp_favorite_weekday"/>
+                            <field name="sp_favorite_hour"/>
+                            <field name="sp_favorite_channel"/>
+                            <field name="sp_typical_interval" widget="float" digits="[16,1]"/>
+                            <field name="sp_next_order_expected"/>
+                            <field name="sp_last_message_date"/>
+                        </group>
+                    </group>
+                    <button name="action_sp_recompute" type="object" string="Recalcular perfil" class="btn-secondary"/>
+                    <separator string="Pedidos recentes"/>
+                    <field name="sp_order_ids" readonly="1" limit="10">
+                        <list>
+                            <field name="name"/>
+                            <field name="date_order"/>
+                            <field name="channel"/>
+                            <field name="item_summary"/>
+                            <field name="amount_total" widget="monetary"/>
+                            <field name="state" widget="badge"/>
+                        </list>
+                    </field>
+                    <separator string="Mensagens"/>
+                    <field name="sp_message_ids" readonly="1" limit="10">
+                        <list>
+                            <field name="create_date" string="Data"/>
+                            <field name="channel"/>
+                            <field name="campaign_id"/>
+                            <field name="automation_id"/>
+                            <field name="body"/>
+                            <field name="state" widget="badge"/>
+                            <field name="clicked"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_sp_customer_list" model="ir.ui.view">
+        <field name="name">res.partner.sp.customer.list</field>
+        <field name="model">res.partner</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <list string="Clientes" default_order="sp_monetary desc"
+                  decoration-danger="sp_churn_risk == 'critical'" decoration-warning="sp_churn_risk == 'warning'">
+                <field name="name"/>
+                <field name="sp_whatsapp"/>
+                <field name="sp_restaurant_id" optional="show"/>
+                <field name="sp_segment" widget="badge" decoration-success="sp_segment in ('champions','loyal')"
+                       decoration-danger="sp_segment in ('at_risk','cant_lose','lost')"
+                       decoration-warning="sp_segment in ('need_attention','about_to_sleep','hibernating')"
+                       decoration-info="sp_segment in ('new','promising','potential_loyal')"/>
+                <field name="sp_rfv_score"/>
+                <field name="sp_recency_days"/>
+                <field name="sp_frequency"/>
+                <field name="sp_monetary" widget="monetary" sum="Total"/>
+                <field name="sp_ltv" widget="monetary" optional="show"/>
+                <field name="sp_typical_interval" optional="show" widget="float" digits="[16,1]"/>
+                <field name="sp_favorite_product_id" optional="show"/>
+                <field name="sp_favorite_weekday" optional="hide"/>
+                <field name="sp_churn_risk" widget="badge" decoration-danger="sp_churn_risk == 'critical'"
+                       decoration-warning="sp_churn_risk == 'warning'"/>
+                <field name="sp_birthday" optional="hide"/>
+                <field name="sp_opt_in" optional="hide"/>
+                <field name="sp_last_order_date" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sp_customer_kanban" model="ir.ui.view">
+        <field name="name">res.partner.sp.customer.kanban</field>
+        <field name="model">res.partner</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="sp_segment" group_create="false" quick_create="false">
+                <field name="sp_segment"/>
+                <field name="sp_churn_risk"/>
+                <templates>
+                    <t t-name="card">
+                        <div>
+                            <strong><field name="name"/></strong>
+                            <span t-if="record.sp_churn_risk.raw_value == 'critical'" class="badge text-bg-danger ms-1">🚩 sumiu</span>
+                            <span t-if="record.sp_churn_risk.raw_value == 'warning'" class="badge text-bg-warning ms-1">⚠ atrasado</span>
+                        </div>
+                        <div class="text-muted small">RFV <field name="sp_rfv_score"/> · <field name="sp_total_orders"/> pedidos · LTV <field name="sp_ltv" widget="monetary"/></div>
+                        <div class="small">Último pedido há <field name="sp_recency_days"/> dias · Favorito: <field name="sp_favorite_product_id"/></div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_sp_customer_search" model="ir.ui.view">
+        <field name="name">res.partner.sp.customer.search</field>
+        <field name="model">res.partner</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="sp_whatsapp"/>
+                <field name="sp_restaurant_id"/>
+                <field name="sp_favorite_product_id"/>
+                <filter name="sp_customers" string="Clientes de delivery" domain="[('sp_is_customer', '=', True)]"/>
+                <separator/>
+                <filter name="risk" string="Red flag (em risco)" domain="[('sp_churn_risk', 'in', ('warning', 'critical'))]"/>
+                <filter name="critical" string="Crítico" domain="[('sp_churn_risk', '=', 'critical')]"/>
+                <filter name="birthday_soon" string="Aniversário na semana" domain="[('sp_birthday_soon', '=', True)]"/>
+                <filter name="opt_in" string="Com opt-in" domain="[('sp_opt_in', '=', True)]"/>
+                <separator/>
+                <filter name="champions" string="Campeões" domain="[('sp_segment', '=', 'champions')]"/>
+                <filter name="loyal" string="Fiéis" domain="[('sp_segment', '=', 'loyal')]"/>
+                <filter name="new" string="Novos" domain="[('sp_segment', '=', 'new')]"/>
+                <filter name="at_risk" string="Em risco / não pode perder" domain="[('sp_segment', 'in', ('at_risk', 'cant_lose'))]"/>
+                <filter name="lost" string="Perdidos / hibernando" domain="[('sp_segment', 'in', ('lost', 'hibernating'))]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_segment" string="Segmento RFV" context="{'group_by': 'sp_segment'}"/>
+                    <filter name="group_risk" string="Risco" context="{'group_by': 'sp_churn_risk'}"/>
+                    <filter name="group_weekday" string="Dia habitual" context="{'group_by': 'sp_favorite_weekday'}"/>
+                    <filter name="group_channel" string="Canal preferido" context="{'group_by': 'sp_favorite_channel'}"/>
+                    <filter name="group_restaurant" string="Restaurante" context="{'group_by': 'sp_restaurant_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_sp_customer_graph" model="ir.ui.view">
+        <field name="name">res.partner.sp.customer.graph</field>
+        <field name="model">res.partner</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <graph string="Clientes por segmento" type="bar">
+                <field name="sp_segment"/>
+                <field name="sp_monetary" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_sp_customer_pivot" model="ir.ui.view">
+        <field name="name">res.partner.sp.customer.pivot</field>
+        <field name="model">res.partner</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <pivot string="Matriz RFV">
+                <field name="sp_r_score" type="row"/>
+                <field name="sp_f_score" type="col"/>
+                <field name="sp_monetary" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_sp_customers" model="ir.actions.act_window">
+        <field name="name">Clientes</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,kanban,form,graph,pivot</field>
+        <field name="domain">[('sp_is_customer', '=', True)]</field>
+        <field name="context">{'default_sp_is_customer': True}</field>
+        <field name="search_view_id" ref="view_sp_customer_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_sp_customer_list')}),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_sp_customer_kanban')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('base.view_partner_form')}),
+            (0, 0, {'view_mode': 'graph', 'view_id': ref('view_sp_customer_graph')}),
+            (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_sp_customer_pivot')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nenhum cliente ainda</p>
+            <p>Os clientes entram automaticamente pelo cardápio digital ou podem ser importados.</p>
+        </field>
+    </record>
+
+    <record id="action_sp_customers_risk" model="ir.actions.act_window">
+        <field name="name">Red flags: clientes em risco</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('sp_is_customer', '=', True), ('sp_churn_risk', 'in', ('warning', 'critical'))]</field>
+        <field name="search_view_id" ref="view_sp_customer_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_sp_customer_list')}),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_sp_customer_kanban')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('base.view_partner_form')})]"/>
+    </record>
+
+    <record id="action_sp_customers_rfv" model="ir.actions.act_window">
+        <field name="name">Matriz RFV</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">kanban,pivot,graph,list,form</field>
+        <field name="domain">[('sp_is_customer', '=', True)]</field>
+        <field name="search_view_id" ref="view_sp_customer_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_sp_customer_kanban')}),
+            (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_sp_customer_pivot')}),
+            (0, 0, {'view_mode': 'graph', 'view_id': ref('view_sp_customer_graph')}),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_sp_customer_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('base.view_partner_form')})]"/>
+    </record>
+</odoo>

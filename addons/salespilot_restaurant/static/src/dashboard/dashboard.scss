@@ -1,0 +1,44 @@
+.o_sp_dashboard {
+    background: #f6f6f7;
+    min-height: 100%;
+
+    h5 { font-weight: 700; font-size: 15px; }
+
+    .o_sp_kpi {
+        background: #fff; border-radius: 12px; padding: 12px 14px; height: 100%;
+        box-shadow: 0 1px 2px rgba(0,0,0,.05); cursor: pointer; border-left: 4px solid #2a78d6;
+        &.o_sp_kpi_danger { border-left-color: #e34948; }
+        &.o_sp_kpi_info { border-left-color: #1baf7a; }
+        .o_sp_kpi_label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .03em; }
+        .o_sp_kpi_value { font-size: 26px; font-weight: 800; line-height: 1.2; }
+    }
+    .o_sp_card {
+        background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    }
+    .o_sp_clickable { cursor: pointer; }
+    .o_sp_clickable:hover { background: #f1f5f9; }
+    .o_sp_table td, .o_sp_table th { padding: 4px 6px; font-size: 13px; vertical-align: middle; }
+    .o_sp_dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+
+    .o_sp_matrix {
+        display: grid; grid-template-columns: 36px repeat(5, 1fr); gap: 3px; margin-top: 8px;
+        .o_sp_matrix_head { font-size: 11px; color: #6b7280; display: flex; align-items: center; justify-content: center; }
+        .o_sp_matrix_cell { height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #0b0b0b; }
+    }
+    .o_sp_heat {
+        display: grid; grid-template-columns: 34px repeat(13, 1fr); gap: 2px; margin-top: 8px;
+        .o_sp_heat_head { font-size: 10px; color: #6b7280; display: flex; align-items: center; justify-content: center; }
+        .o_sp_heat_cell { height: 22px; border-radius: 4px; }
+    }
+    .o_sp_insight {
+        border-left: 3px solid #2a78d6; background: #f8fafc; border-radius: 8px; padding: 10px 12px; margin-top: 10px;
+        &.o_sp_prio_3 { border-left-color: #e34948; }
+        &.o_sp_prio_1 { border-left-color: #9ca3af; }
+    }
+    .o_sp_alert {
+        border-radius: 8px; padding: 8px 10px; margin-top: 8px; background: #fff7ed; border: 1px solid #fed7aa;
+        &.o_sp_sev_3 { background: #fef2f2; border-color: #fecaca; }
+        &.o_sp_sev_1 { background: #f0fdf4; border-color: #bbf7d0; }
+    }
+    .o_sp_plan { background: linear-gradient(135deg, #fff, #f0fdf4); }
+}

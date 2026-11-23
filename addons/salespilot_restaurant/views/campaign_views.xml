@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sp_campaign_form" model="ir.ui.view">
+        <field name="name">sp.campaign.form</field>
+        <field name="model">sp.campaign</field>
+        <field name="arch" type="xml">
+            <form string="Campanha">
+                <header>
+                    <button name="action_send_now" type="object" string="Enviar agora" class="btn-primary"
+                            invisible="state not in ('draft', 'scheduled')" confirm="Enviar a campanha para todo o público agora?"/>
+                    <button name="action_schedule" type="object" string="Agendar" invisible="state != 'draft'"/>
+                    <button name="action_generate_copy" type="object" string="✨ Sugerir texto" invisible="state not in ('draft', 'scheduled')"/>
+                    <button name="action_preview_audience" type="object" string="Ver público"/>
+                    <button name="action_done" type="object" string="Encerrar" invisible="state != 'sent'"/>
+                    <button name="action_cancel" type="object" string="Cancelar" invisible="state in ('sent', 'done', 'cancelled')"/>
+                    <button name="action_reset_draft" type="object" string="Voltar a rascunho" invisible="state not in ('scheduled', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,sent,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_messages" type="object" class="oe_stat_button" icon="fa-paper-plane">
+                            <field name="sent_count" widget="statinfo" string="Enviadas"/>
+                        </button>
+                        <button name="action_view_orders" type="object" class="oe_stat_button" icon="fa-shopping-bag">
+                            <field name="order_count" widget="statinfo" string="Pedidos"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-money" disabled="1">
+                            <field name="attributed_revenue" widget="statinfo" string="Receita"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-line-chart" disabled="1">
+                            <field name="roi" widget="statinfo" string="ROI (x)"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Ex.: Reativação de clientes em risco - novembro"/></h1>
+                    </div>
+                    <group>
+                        <group string="Configuração">
+                            <field name="restaurant_id" options="{'no_create': True}"/>
+                            <field name="campaign_type"/>
+                            <field name="channel" widget="radio" options="{'horizontal': true}"/>
+                            <field name="date_scheduled"/>
+                            <field name="date_sent" invisible="not date_sent"/>
+                            <field name="automation_id" invisible="not automation_id"/>
+                            <field name="cost_per_message"/>
+                        </group>
+                        <group string="Oferta">
+                            <field name="coupon_code"/>
+                            <field name="discount_pct"/>
+                            <field name="discount_value"/>
+                            <field name="coupon_valid_days"/>
+                            <field name="utm_token" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Público">
+                            <div class="alert alert-secondary" role="status">
+                                Público atual: <strong><field name="audience_count" class="oe_inline"/></strong> cliente(s) — <field name="segment_ids_display" class="oe_inline"/>
+                            </div>
+                            <group>
+                                <group>
+                                    <field name="segment_codes" placeholder="champions,loyal,at_risk..."/>
+                                    <field name="target_churn_risk"/>
+                                    <field name="target_favorite_product_id"/>
+                                    <field name="only_opt_in"/>
+                                </group>
+                                <group>
+                                    <field name="target_min_orders"/>
+                                    <field name="target_days_since_min"/>
+                                    <field name="target_days_since_max"/>
+                                </group>
+                            </group>
+                            <p class="text-muted">Códigos de segmento: champions, loyal, potential_loyal, new, promising, need_attention,
+                                about_to_sleep, at_risk, cant_lose, hibernating, lost.</p>
+                            <field name="partner_ids" widget="many2many_tags" domain="[('sp_restaurant_id', '=', restaurant_id)]"/>
+                        </page>
+                        <page string="Mensagem">
+                            <field name="message_template" placeholder="Oi {nome}! ..."/>
+                            <p class="text-muted">Variáveis: {nome} {produto_favorito} {cupom} {desconto} {link} {restaurante} {dia_semana} {dias_sem_pedir}.
+                                O {link} é rastreado por cliente e atribui os pedidos à campanha.</p>
+                        </page>
+                        <page string="Resultados">
+                            <group>
+                                <group>
+                                    <field name="sent_count"/>
+                                    <field name="delivered_count"/>
+                                    <field name="click_count"/>
+                                    <field name="click_rate" widget="float" digits="[16,1]"/>
+                                </group>
+                                <group>
+                                    <field name="order_count"/>
+                                    <field name="conversion_rate" widget="float" digits="[16,1]"/>
+                                    <field name="attributed_revenue" widget="monetary"/>
+                                    <field name="cost_total" widget="monetary"/>
+                                    <field name="roi" widget="float" digits="[16,1]"/>
+                                </group>
+                            </group>
+                            <field name="sp_message_ids" readonly="1" limit="20">
+                                <list>
+                                    <field name="partner_id"/>
+                                    <field name="to"/>
+                                    <field name="body"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="clicked"/>
+                                    <field name="order_count"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sp_campaign_list" model="ir.ui.view">
+        <field name="name">sp.campaign.list</field>
+        <field name="model">sp.campaign</field>
+        <field name="arch" type="xml">
+            <list string="Campanhas">
+                <field name="name"/>
+                <field name="restaurant_id" optional="show"/>
+                <field name="campaign_type"/>
+                <field name="channel"/>
+                <field name="date_scheduled"/>
+                <field name="audience_count"/>
+                <field name="sent_count" sum="Enviadas"/>
+                <field name="click_rate" widget="float" digits="[16,1]"/>
+                <field name="order_count" sum="Pedidos"/>
+                <field name="conversion_rate" widget="float" digits="[16,1]"/>
+                <field name="attributed_revenue" widget="monetary" sum="Receita"/>
+                <field name="roi" widget="float" digits="[16,1]"/>
+                <field name="state" widget="badge" decoration-success="state == 'sent'" decoration-info="state == 'scheduled'" decoration-muted="state in ('done','cancelled')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sp_campaign_kanban" model="ir.ui.view">
+        <field name="name">sp.campaign.kanban</field>
+        <field name="model">sp.campaign</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" quick_create="false">
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div><strong><field name="name"/></strong></div>
+                        <div class="small text-muted"><field name="campaign_type"/> · <field name="channel"/> · <field name="date_scheduled"/></div>
+                        <div class="small"><field name="sent_count"/> enviadas · <field name="order_count"/> pedidos · <field name="attributed_revenue" widget="monetary"/></div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_sp_campaign_search" model="ir.ui.view">
+        <field name="name">sp.campaign.search</field>
+        <field name="model">sp.campaign</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="restaurant_id"/>
+                <filter name="active_states" string="Ativas" domain="[('state', 'in', ('draft', 'scheduled', 'sending', 'sent'))]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_type" string="Tipo" context="{'group_by': 'campaign_type'}"/>
+                    <filter name="group_restaurant" string="Restaurante" context="{'group_by': 'restaurant_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_sp_campaigns" model="ir.actions.act_window">
+        <field name="name">Campanhas</field>
+        <field name="res_model">sp.campaign</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Crie a primeira campanha</p>
+            <p>Escolha o tipo (reativação, aniversário, lembrete de hábito...), o público pela matriz RFV e o canal.
+               No piloto, os envios são simulados: as mensagens ficam na caixa de saída com link rastreado.</p>
+        </field>
+    </record>
+</odoo>

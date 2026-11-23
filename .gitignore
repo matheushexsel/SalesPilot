@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.odoo-data/
+.odoo-local.conf
+*.log
+.DS_Store

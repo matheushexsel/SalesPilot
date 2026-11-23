@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="crm_team_salespilot" model="crm.team">
+            <field name="name">Prospecção SalesPilot</field>
+            <field name="use_leads" eval="False"/>
+            <field name="use_opportunities" eval="True"/>
+        </record>
+        <record id="stage_prospect_new" model="crm.stage">
+            <field name="name">Prospectado</field>
+            <field name="sequence">1</field>
+            <field name="team_id" ref="crm_team_salespilot"/>
+        </record>
+        <record id="stage_prospect_qualified" model="crm.stage">
+            <field name="name">Qualificado (IA)</field>
+            <field name="sequence">2</field>
+            <field name="team_id" ref="crm_team_salespilot"/>
+        </record>
+        <record id="stage_prospect_meeting" model="crm.stage">
+            <field name="name">Reunião agendada</field>
+            <field name="sequence">3</field>
+            <field name="team_id" ref="crm_team_salespilot"/>
+        </record>
+        <record id="stage_prospect_proposal" model="crm.stage">
+            <field name="name">Proposta / piloto</field>
+            <field name="sequence">4</field>
+            <field name="team_id" ref="crm_team_salespilot"/>
+        </record>
+        <record id="stage_prospect_won" model="crm.stage">
+            <field name="name">Cliente ativo</field>
+            <field name="sequence">5</field>
+            <field name="is_won" eval="True"/>
+            <field name="team_id" ref="crm_team_salespilot"/>
+        </record>
+    </data>
+</odoo>

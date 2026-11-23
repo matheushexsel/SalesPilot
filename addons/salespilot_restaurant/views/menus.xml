@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_sp_root" name="SalesPilot" web_icon="salespilot_restaurant,static/description/icon.png" sequence="5"
+              groups="group_sp_user"/>
+
+    <menuitem id="menu_sp_dashboard" name="Dashboard" parent="menu_sp_root" action="action_sp_dashboard" sequence="1"/>
+
+    <menuitem id="menu_sp_customers_root" name="Clientes" parent="menu_sp_root" sequence="10"/>
+    <menuitem id="menu_sp_customers" name="Base de clientes" parent="menu_sp_customers_root" action="action_sp_customers" sequence="1"/>
+    <menuitem id="menu_sp_customers_rfv" name="Matriz RFV" parent="menu_sp_customers_root" action="action_sp_customers_rfv" sequence="2"/>
+    <menuitem id="menu_sp_customers_risk" name="Red flags" parent="menu_sp_customers_root" action="action_sp_customers_risk" sequence="3"/>
+    <menuitem id="menu_sp_alerts" name="Alertas" parent="menu_sp_customers_root" action="action_sp_alerts" sequence="4"/>
+    <menuitem id="menu_sp_insights" name="Insights" parent="menu_sp_customers_root" action="action_sp_insights" sequence="5"/>
+
+    <menuitem id="menu_sp_orders_root" name="Pedidos" parent="menu_sp_root" sequence="20"/>
+    <menuitem id="menu_sp_orders" name="Pedidos" parent="menu_sp_orders_root" action="action_sp_orders" sequence="1"/>
+    <menuitem id="menu_sp_order_lines" name="Itens vendidos" parent="menu_sp_orders_root" action="action_sp_order_lines" sequence="2"/>
+    <menuitem id="menu_sp_menu_items" name="Cardápio" parent="menu_sp_orders_root" action="action_sp_menu_items" sequence="3"/>
+    <menuitem id="menu_sp_menu_categories" name="Categorias do cardápio" parent="menu_sp_orders_root" action="action_sp_menu_category" sequence="4" groups="group_sp_manager"/>
+
+    <menuitem id="menu_sp_marketing_root" name="Relacionamento" parent="menu_sp_root" sequence="30"/>
+    <menuitem id="menu_sp_campaigns" name="Campanhas" parent="menu_sp_marketing_root" action="action_sp_campaigns" sequence="1"/>
+    <menuitem id="menu_sp_automations" name="Réguas automáticas" parent="menu_sp_marketing_root" action="action_sp_automations" sequence="2"/>
+    <menuitem id="menu_sp_messages" name="Caixa de saída" parent="menu_sp_marketing_root" action="action_sp_messages" sequence="3"/>
+
+    <menuitem id="menu_sp_saas_root" name="SalesPilot (operadora)" parent="menu_sp_root" sequence="40" groups="group_sp_admin"/>
+    <menuitem id="menu_sp_restaurants" name="Restaurantes" parent="menu_sp_saas_root" action="action_sp_restaurant" sequence="1"/>
+    <menuitem id="menu_sp_billing" name="Faturas (mensalidade + sucesso)" parent="menu_sp_saas_root" action="action_sp_billing" sequence="2"/>
+    <menuitem id="menu_sp_prospects" name="Prospecção de restaurantes" parent="menu_sp_saas_root" action="action_sp_prospects" sequence="3"/>
+
+    <menuitem id="menu_sp_config_root" name="Configuração" parent="menu_sp_root" sequence="90" groups="group_sp_manager"/>
+    <menuitem id="menu_sp_config_restaurant" name="Meu restaurante" parent="menu_sp_config_root" action="action_sp_restaurant" sequence="1"/>
+</odoo>
