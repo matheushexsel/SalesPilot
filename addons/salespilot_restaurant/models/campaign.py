@@ -114,7 +114,10 @@ class SpCampaign(models.Model):
             "vip": {"segment_codes": "champions", "discount_pct": 10, "coupon_code": "VIP10"},
             "launch": {"segment_codes": "champions,loyal,potential_loyal,promising"},
         }
-        for k, v in presets.get(self.campaign_type or "", {}).items():
+        defaults = {"segment_codes": "", "target_churn_risk": "any", "discount_pct": 0.0, "discount_value": 0.0,
+                    "coupon_code": False}
+        defaults.update(presets.get(self.campaign_type or "", {}))
+        for k, v in defaults.items():
             setattr(self, k, v)
 
     # ------------------------------------------------------------------

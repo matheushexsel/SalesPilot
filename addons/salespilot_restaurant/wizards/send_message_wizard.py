@@ -9,7 +9,8 @@ class SpSendMessageWizard(models.TransientModel):
     _name = "sp.send.message.wizard"
     _description = "Enviar mensagem para clientes"
 
-    restaurant_id = fields.Many2one("sp.restaurant", string="Restaurante", required=True)
+    restaurant_id = fields.Many2one("sp.restaurant", string="Restaurante", required=True,
+                                    default=lambda self: self._default_restaurant())
     partner_ids = fields.Many2many("res.partner", string="Clientes", required=True)
     channel = fields.Selection([("whatsapp", "WhatsApp"), ("sms", "SMS"), ("email", "E-mail")], string="Canal", default="whatsapp", required=True)
     preset = fields.Selection(string="Modelo de mensagem", selection=[
@@ -22,6 +23,15 @@ class SpSendMessageWizard(models.TransientModel):
     alert_id = fields.Many2one("sp.alert", string="Alerta")
     campaign_id = fields.Many2one("sp.campaign", "Atribuir à campanha")
     preview = fields.Text("Prévia (1º cliente)", compute="_compute_preview")
+
+    @api.model
+    def _default_restaurant(self):
+        partner_ids = self.env.context.get("default_partner_ids") or self.env.context.get("active_ids") or []
+        if partner_ids and isinstance(partner_ids, list) and not isinstance(partner_ids[0], (list, tuple)):
+            partners = self.env["res.partner"].browse(partner_ids)
+            if partners.sp_restaurant_id:
+                return partners.sp_restaurant_id[:1]
+        return self.env["sp.restaurant"]._get_user_restaurants()[:1]
 
     @api.onchange("preset")
     def _onchange_preset(self):
@@ -67,5 +77,6 @@ class SpSendMessageWizard(models.TransientModel):
         return {
             "type": "ir.actions.client", "tag": "display_notification",
             "params": {"title": _("Mensagens enviadas"), "type": "success", "sticky": False,
-                       "message": _("%s mensagem(ns) colocada(s) na fila (provedor: simulação).", len(msgs))},
+                       "message": _("%s mensagem(ns) colocada(s) na fila (provedor: simulação).", len(msgs)),
+                       "next": {"type": "ir.actions.act_window_close"}},
         }

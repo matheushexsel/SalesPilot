@@ -18,7 +18,7 @@ header p { margin: 2px 0 0; opacity:.92; font-size: 14px; }
 nav.cats { position: sticky; top:0; background: var(--bg); padding: 10px 0; display:flex; gap:8px; overflow-x:auto; z-index: 5; }
 nav.cats a { white-space: nowrap; padding: 8px 14px; border-radius: 999px; background:#fff; color: var(--txt); text-decoration:none; font-size: 14px; border:1px solid #e5e7eb; }
 nav.cats a.active { background: var(--p); color:#fff; border-color: var(--p); }
-h2.cat { font-size: 18px; margin: 18px 0 10px; }
+h2.cat { font-size: 18px; margin: 18px 0 10px; scroll-margin-top: 64px; }
 .grid { display:grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
 .card { background: var(--card); border-radius: 14px; padding: 12px; display:flex; gap:12px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }

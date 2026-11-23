@@ -49,8 +49,8 @@ class SpInsight(models.Model):
             "default_discount_pct": self.action_discount or 0.0,
             "default_message_template": DEFAULT_TEMPLATES.get(self.action_campaign_type, DEFAULT_TEMPLATES["manual"]),
         }
-        return {"type": "ir.actions.act_window", "res_model": "sp.campaign", "view_mode": "form", "target": "current",
-                "name": _("Nova campanha"), "context": ctx}
+        return {"type": "ir.actions.act_window", "res_model": "sp.campaign", "view_mode": "form", "views": [(False, "form")],
+                "target": "current", "name": _("Nova campanha"), "context": ctx}
 
     def action_dismiss(self):
         self.write({"state": "dismissed"})

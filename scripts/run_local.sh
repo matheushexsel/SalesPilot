@@ -1,6 +1,7 @@
 #!/bin/bash
 # Roda o piloto sem Docker, a partir do código-fonte do Odoo 18 Community.
-# Pré-requisitos: PostgreSQL local com usuário odoo/odoo, Python 3.10-3.12, git.
+# Pré-requisitos: PostgreSQL local com usuário odoo/odoo (createdb), Python 3.10-3.12 com venv (python3-venv), git,
+# e as libs de build do Odoo (libpq-dev, libxml2-dev, libxslt1-dev, libjpeg-dev, zlib1g-dev).
 #   ./scripts/run_local.sh            # cria o banco (1ª vez) e sobe em http://localhost:8069
 #   ./scripts/run_local.sh --reset    # apaga e recria o banco com os dados de demonstração
 set -e
@@ -35,7 +36,9 @@ CFG
 
 if [ "$1" == "--reset" ]; then
   echo ">>> Apagando banco $DB"
-  dropdb -h localhost -U odoo "$DB" 2>/dev/null || PGPASSWORD=odoo dropdb -h localhost -U odoo "$DB" || true
+  if PGPASSWORD=odoo psql -h localhost -U odoo -lqt | cut -d '|' -f1 | grep -qw "$DB"; then
+    PGPASSWORD=odoo dropdb -h localhost -U odoo "$DB" || { echo "!!! Não foi possível apagar o banco (ainda há um Odoo conectado?)"; exit 1; }
+  fi
 fi
 if ! PGPASSWORD=odoo psql -h localhost -U odoo -lqt 2>/dev/null | cut -d '|' -f1 | grep -qw "$DB"; then
   echo ">>> Criando banco $DB e instalando módulos (leva ~1 min)"

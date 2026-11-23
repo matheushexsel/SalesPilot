@@ -553,7 +553,9 @@ class SpRfvEngine(models.AbstractModel):
         marketplace_cost = tracked_month * (restaurant.marketplace_fee_reference_pct or 0.0) / 100.0
         return {
             "restaurant": {"id": rid, "name": restaurant.name, "slug": restaurant.slug, "segment": restaurant.segment,
-                           "menu_url": restaurant.menu_url, "last_rfv_run": fields.Datetime.to_string(restaurant.last_rfv_run) if restaurant.last_rfv_run else None},
+                           "menu_url": restaurant.menu_url,
+                           "last_rfv_run": restaurant.last_rfv_run.replace(tzinfo=pytz.utc).astimezone(TZ).strftime("%d/%m/%Y %H:%M")
+                           if restaurant.last_rfv_run else None},
             "kpis": {
                 "revenue_30d": rev30, "revenue_prev_30d": rev_prev, "orders_30d": orders30, "orders_prev_30d": orders_prev,
                 "avg_ticket_30d": ticket30, "active_customers_30d": cust30, "active_customers_prev": cust_prev,

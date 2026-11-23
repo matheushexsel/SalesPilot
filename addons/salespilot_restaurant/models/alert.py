@@ -127,7 +127,7 @@ class SpAlert(models.Model):
         self.ensure_one()
         return {
             "type": "ir.actions.act_window", "res_model": "sp.send.message.wizard", "name": _("Enviar mensagem"),
-            "view_mode": "form", "target": "new",
+            "view_mode": "form", "views": [(False, "form")], "target": "new",
             "context": {"default_partner_ids": [(6, 0, self.partner_id.ids)], "default_restaurant_id": self.restaurant_id.id,
                         "default_alert_id": self.id, "default_preset": "reactivation" if "churn" in self.alert_type or self.alert_type == "cant_lose" else self.alert_type},
         }

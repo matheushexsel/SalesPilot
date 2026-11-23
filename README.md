@@ -31,7 +31,7 @@ Acesse **http://localhost:8069**.
 
 ### Opção B — sem Docker (código-fonte do Odoo)
 
-Requer PostgreSQL local (usuário `odoo` / senha `odoo`, com permissão de criar banco), Python 3.10–3.12 e git.
+Requer PostgreSQL local (usuário `odoo` / senha `odoo`, com permissão de criar banco), Python 3.10–3.12 com `venv` (pacote `python3-venv`), git e as bibliotecas de build do Odoo (`libpq-dev libxml2-dev libxslt1-dev libjpeg-dev zlib1g-dev`).
 
 ```bash
 ./scripts/run_local.sh            # clona o Odoo 18, cria o venv, o banco e sobe em :8069
@@ -83,13 +83,15 @@ Menus: **Clientes › Base de clientes / Matriz RFV (kanban por segmento + pivô
 - Cardápio por restaurante em `product.template` (categoria, tipo, destaque, "combina com", vendas 90 dias).
 
 ### 2.3 Cardápio digital público (`/cardapio/<slug>`)
-- Mobile-first, sem login. O cliente informa o WhatsApp → **pop-up personalizado** com saudação
+- Mobile-first, sem login. O cliente informa o WhatsApp → **pop-up personalizado** com saudação (por privacidade, nome
+  completo e endereço só são preenchidos para quem chegou pelo próprio link rastreado)
   por perfil ("Quarta é dia de Smash Burger, né?", "Que saudade, faz 23 dias…", "Você é VIP 🏆")
   e recomendações (favorito + itens que acompanham + mais pedidos).
 - **Upsell/cross-sell na sacola**: coocorrência de itens ("44% de quem pede Smash leva Batata") e
   regra de upgrade (2+ principais sem bebida grande → sugere a 2L, "sai mais em conta que duas latas").
-- Checkout cria o pedido, identifica/cadastra o cliente pelo telefone, aplica cupom de campanha e
-  registra pagamento **simulado** (Pix copia-e-cola fictício, cartão online, Apple/Google Pay, na entrega).
+- Checkout cria o pedido, identifica/cadastra o cliente pelo telefone, aplica cupom de campanha (com validade e
+  uso único por cliente) e mostra um pagamento **simulado** (Pix copia-e-cola fictício, cartão online, Apple/Google Pay,
+  na entrega). Nenhuma cobrança acontece: o pedido fica com pagamento *pendente* até o gateway ser integrado.
 - Página de acompanhamento do pedido.
 
 ### 2.4 Campanhas e caixa de saída (WhatsApp / SMS / e-mail)

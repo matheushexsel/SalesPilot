@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
+from odoo.tools.safe_eval import safe_eval
 
 
 def slugify(value):
@@ -180,6 +181,29 @@ class SpRestaurant(models.Model):
         if self.env.user.has_group("salespilot_restaurant.group_sp_admin"):
             return self.search([])
         return self.env.user.sp_restaurant_ids
+
+    @api.model
+    def get_dashboard_action(self, xmlid, restaurant_id, domain=None, name=None, context=None):
+        """Devolve uma ação do módulo (com suas views e filtros) restrita a um restaurante, para o dashboard."""
+        if not xmlid.startswith("salespilot_restaurant."):
+            xmlid = "salespilot_restaurant." + xmlid
+        action = self.env.ref(xmlid).sudo()._get_action_dict()
+        restaurant = self._get_user_restaurants().filtered(lambda r: r.id == restaurant_id)
+        if not restaurant:
+            return False
+        field = "sp_restaurant_id" if action["res_model"] in ("res.partner", "product.template") else "restaurant_id"
+        base_domain = [(field, "=", restaurant.id)]
+        try:
+            existing = safe_eval(action.get("domain") or "[]")
+        except Exception:
+            existing = []
+        action["domain"] = base_domain + list(existing) + list(domain or [])
+        if name:
+            action["name"] = action["display_name"] = name
+        ctx = dict(context or {})
+        ctx.setdefault("default_" + field, restaurant.id)
+        action["context"] = ctx
+        return action
 
     @api.model
     def get_dashboard_data(self, restaurant_id=None):

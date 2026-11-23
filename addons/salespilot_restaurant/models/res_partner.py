@@ -165,7 +165,7 @@ class ResPartner(models.Model):
         self.ensure_one()
         return {
             "type": "ir.actions.act_window", "res_model": "sp.send.message.wizard", "name": "Enviar mensagem",
-            "view_mode": "form", "target": "new",
+            "view_mode": "form", "views": [(False, "form")], "target": "new",
             "context": {"default_partner_ids": [(6, 0, self.ids)], "default_restaurant_id": self.sp_restaurant_id.id},
         }
 

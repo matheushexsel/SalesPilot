@@ -9,6 +9,14 @@
     let customer = null;
     const brl = v => 'R$ ' + (v || 0).toFixed(2).replace('.', ',');
     const $ = s => document.querySelector(s);
+    const MAX_QTY = 50;
+    // Escapa qualquer texto vindo do servidor antes de montar HTML (nomes/descrições são editáveis no backend).
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+    const store = {
+        get(k) { try { return JSON.parse(sessionStorage.getItem('sp_' + SLUG + '_' + k)); } catch (e) { return null; } },
+        set(k, v) { try { sessionStorage.setItem('sp_' + SLUG + '_' + k, JSON.stringify(v)); } catch (e) { /* modo privado */ } },
+    };
+    Object.assign(cart, Object.fromEntries(Object.entries(store.get('cart') || {}).filter(([id, q]) => byId[id] && q > 0)));
 
     async function rpc(path, params) {
         const r = await fetch('/cardapio/' + SLUG + '/api/' + path, {
@@ -16,7 +24,7 @@
             body: JSON.stringify({jsonrpc: '2.0', method: 'call', id: Date.now(), params: params || {}}),
         });
         const data = await r.json();
-        if (data.error) { throw new Error((data.error.data && data.error.data.message) || data.error.message); }
+        if (data.error) { throw new Error('Não foi possível concluir. Tente novamente.'); }
         return data.result;
     }
 
@@ -43,8 +51,8 @@
         const el = document.createElement('div'); el.className = 'card'; el.id = 'p-' + p.id;
         const img = p.has_image ? `<img src="/cardapio/${SLUG}/img/${p.id}" alt=""/>` : `<div class="ph">${emoji(p.kind)}</div>`;
         el.innerHTML = `${img}<div class="body">
-            <div class="name">${p.name} ${p.highlight ? '<span class="badge">destaque</span>' : ''} ${customer && customer.favorite_id === p.id ? '<span class="badge rec">seu favorito</span>' : ''}</div>
-            <div class="desc">${p.description || ''}</div>
+            <div class="name">${esc(p.name)} ${p.highlight ? '<span class="badge">destaque</span>' : ''} ${customer && customer.favorite_id === p.id ? '<span class="badge rec">seu favorito</span>' : ''}</div>
+            <div class="desc">${esc(p.description)}</div>
             <div class="row"><span class="price">${brl(p.price)}</span>
                 <div class="qty"><button data-d="-1">−</button><span id="q-${p.id}">${cart[p.id] || 0}</span><button class="add" data-d="1">+</button></div></div>
         </div>`;
@@ -53,10 +61,11 @@
     }
 
     function change(id, d, fromRec) {
-        cart[id] = Math.max((cart[id] || 0) + d, 0);
+        cart[id] = Math.min(Math.max((cart[id] || 0) + d, 0), MAX_QTY);
         if (!cart[id]) { delete cart[id]; recommended.delete(id); }
         if (fromRec && cart[id]) recommended.add(id);
         const q = document.getElementById('q-' + id); if (q) q.textContent = cart[id] || 0;
+        store.set('cart', cart);
         updateBar();
     }
 
@@ -74,7 +83,7 @@
         const box = $('#cart-lines'); box.innerHTML = '';
         items().forEach(it => {
             const d = document.createElement('div'); d.className = 'line';
-            d.innerHTML = `<span>${it.qty}x ${it.name}</span><span class="qty"><button data-d="-1">−</button><button class="add" data-d="1">+</button><strong style="margin-left:8px">${brl(it.qty * byId[it.id].price)}</strong></span>`;
+            d.innerHTML = `<span>${it.qty}x ${esc(it.name)}</span><span class="qty"><button data-d="-1">−</button><button class="add" data-d="1">+</button><strong style="margin-left:8px">${brl(it.qty * byId[it.id].price)}</strong></span>`;
             d.querySelectorAll('button').forEach(b => b.onclick = () => { change(it.id, parseInt(b.dataset.d)); renderCart(); });
             box.appendChild(d);
         });
@@ -92,7 +101,7 @@
             sl.innerHTML = '';
             sug.forEach(s => {
                 const d = document.createElement('div'); d.className = 's';
-                d.innerHTML = `<div><strong>${s.name}</strong> · ${brl(s.price)}<small>${s.reason}</small></div><button class="btn sm">+ Adicionar</button>`;
+                d.innerHTML = `<div><strong>${esc(s.name)}</strong> · ${brl(s.price)}<small>${esc(s.reason)}</small></div><button class="btn sm">+ Adicionar</button>`;
                 d.querySelector('button').onclick = () => { change(s.id, 1, true); renderCart(); };
                 sl.appendChild(d);
             });
@@ -118,11 +127,15 @@
         const list = $('#rec-list'); list.innerHTML = '';
         (res.recommendations || []).forEach(r => {
             const d = document.createElement('div'); d.className = 'rec-card';
-            d.innerHTML = `<div><strong>${r.name}</strong><div class="muted">${r.reason} · ${brl(r.price)}</div></div><button class="btn sm">+ Adicionar</button>`;
+            d.innerHTML = `<div><strong>${esc(r.name)}</strong><div class="muted">${esc(r.reason)} · ${brl(r.price)}</div></div><button class="btn sm">+ Adicionar</button>`;
             d.querySelector('button').onclick = () => { change(r.id, 1, true); d.querySelector('button').textContent = '✓ Na sacola'; };
             list.appendChild(d);
         });
-        $('#rec-modal').classList.add('open');
+        const seen = store.get('popup_seen_for');
+        if (!silent || seen !== phone) {
+            $('#rec-modal').classList.add('open');
+            store.set('popup_seen_for', phone);
+        }
     }
 
     async function checkout() {
@@ -140,13 +153,13 @@
             $('#checkout-view').style.display = 'none';
             const sv = $('#success-view'); sv.style.display = 'block';
             let payHtml = '';
-            if (res.payment.kind === 'pix') payHtml = `<div class="muted">Pix copia e cola (simulado):</div><div class="pixbox">${res.payment.code}</div>`;
-            sv.innerHTML = `<div class="big">✅</div><h3>Pedido ${res.name} confirmado!</h3>
+            if (res.payment.kind === 'pix') payHtml = `<div class="muted">Pix copia e cola (simulado):</div><div class="pixbox">${esc(res.payment.code)}</div>`;
+            sv.innerHTML = `<div class="big">✅</div><h3>Pedido ${esc(res.name)} confirmado!</h3>
                 <p>Previsão: ~${res.eta_minutes} min · Total <strong>${brl(res.total)}</strong>${res.discount ? ' (desconto de ' + brl(res.discount) + ')' : ''}</p>
-                ${payHtml}<p class="muted">${res.payment.note}</p>
+                ${payHtml}<p class="muted">${esc(res.payment.note)}</p>
                 <p><a href="${res.status_url}">Acompanhar pedido</a></p>
                 <button class="btn" onclick="location.reload()">Fazer outro pedido</button>`;
-            Object.keys(cart).forEach(k => delete cart[k]); updateBar();
+            Object.keys(cart).forEach(k => delete cart[k]); store.set('cart', {}); updateBar();
         } catch (e) { $('#c-err').textContent = e.message || 'Erro ao enviar o pedido.'; }
         finally { btn.disabled = false; btn.textContent = 'Fazer pedido'; }
     }
@@ -157,6 +170,6 @@
     $('#btn-cart').onclick = () => { renderCart(); $('#cart-modal').classList.add('open'); };
     $('#cart-close').onclick = () => $('#cart-modal').classList.remove('open');
     $('#btn-checkout').onclick = checkout;
-    renderMenu();
+    renderMenu(); updateBar();
     if ($('#phone').value) identify(true);
 })();

@@ -122,13 +122,15 @@ export class SpDashboard extends Component {
     }
 
     // ---------------- ações ----------------
+    async openServerAction(xmlid, domain, name, context) {
+        const action = await this.orm.call("sp.restaurant", "get_dashboard_action",
+            [xmlid, this.state.restaurantId, domain || [], name || false, context || {}]);
+        if (action) {
+            await this.action.doAction(action);
+        }
+    }
     openCustomers(domain, name) {
-        this.action.doAction({
-            type: "ir.actions.act_window", res_model: "res.partner", name: name || "Clientes",
-            views: [[false, "list"], [false, "kanban"], [false, "form"]],
-            domain: [["sp_restaurant_id", "=", this.state.restaurantId], ["sp_is_customer", "=", true], ...domain],
-            context: { search_default_sp_customers: 1 },
-        });
+        return this.openServerAction("action_sp_customers", domain, name || "Clientes");
     }
     openSegment(seg) {
         this.openCustomers([["sp_segment", "=", seg.code]], `Clientes: ${seg.label}`);
@@ -140,9 +142,7 @@ export class SpDashboard extends Component {
         this.openCustomers([["sp_segment", "=", "new"]], "Novos clientes");
     }
     openAlerts() {
-        this.action.doAction({ type: "ir.actions.act_window", res_model: "sp.alert", name: "Alertas",
-            views: [[false, "list"], [false, "kanban"], [false, "form"]],
-            domain: [["restaurant_id", "=", this.state.restaurantId], ["state", "=", "open"]] });
+        return this.openServerAction("action_sp_alerts", [["state", "=", "open"]], "Alertas", {});
     }
     openAlert(alert) {
         this.action.doAction({ type: "ir.actions.act_window", res_model: "sp.alert", res_id: alert.id, views: [[false, "form"]] });
@@ -154,19 +154,24 @@ export class SpDashboard extends Component {
         this.action.doAction({ type: "ir.actions.act_window", res_model: "sp.campaign", res_id: c.id, views: [[false, "form"]] });
     }
     openOrders(domain, name) {
-        this.action.doAction({ type: "ir.actions.act_window", res_model: "sp.order", name: name || "Pedidos",
-            views: [[false, "list"], [false, "form"]],
-            domain: [["restaurant_id", "=", this.state.restaurantId], ...domain] });
+        return this.openServerAction("action_sp_orders", domain, name || "Pedidos");
     }
     openMenu() {
         window.open(`/cardapio/${this.state.data.restaurant.slug}`, "_blank");
     }
+    _normalize(action) {
+        // Ações devolvidas por métodos Python trazem só view_mode; o action manager exige "views".
+        if (action && action.type === "ir.actions.act_window" && !action.views) {
+            action.views = (action.view_mode || "list,form").split(",").map((m) => [false, m.trim()]);
+        }
+        return action;
+    }
     async sendAlertMessage(alert) {
-        const action = await this.orm.call("sp.alert", "action_send_message", [[alert.id]]);
+        const action = this._normalize(await this.orm.call("sp.alert", "action_send_message", [[alert.id]]));
         await this.action.doAction(action, { onClose: () => this.load(this.state.restaurantId) });
     }
     async applyInsight(ins) {
-        const action = await this.orm.call("sp.insight", "action_apply", [[ins.id]]);
+        const action = this._normalize(await this.orm.call("sp.insight", "action_apply", [[ins.id]]));
         if (action && action.type) {
             await this.action.doAction(action);
         } else {
